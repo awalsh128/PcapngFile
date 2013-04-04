@@ -24,13 +24,13 @@ namespace PcapngFile
 		internal const int BlockTypeLength = 4;
 
 		public string Comment { get; private set; }
-		public BlockType Type { get; private set; }
+		public BlockType StoreType { get; private set; }
 		public UInt32 TotalLength { get; private set; }
 
 		internal BlockBase(BinaryReader reader)
 		{
 			this.PreReadPosition = reader.BaseStream.Position;
-			this.Type = (BlockType)reader.ReadUInt32();
+			this.StoreType = (BlockType)reader.ReadUInt32();
 			this.TotalLength = reader.ReadUInt32();
 		}
 
@@ -124,7 +124,7 @@ namespace PcapngFile
 
 		public void Serialize(StreamWriter writer)
 		{
-			writer.Write((UInt32)this.Type);
+			writer.Write((UInt32)this.StoreType);
 			writer.Write((UInt32)this.TotalLength);
 			//this.OnSerialize(writer);
 			writer.Write((UInt32)this.TotalLength);
