@@ -9,50 +9,81 @@ using System.Threading.Tasks;
 namespace PcapngFile
 {
 	/// <summary>
-	/// 
+	/// Reads PCAP Next Generation files and generates CLR objects from its data.
 	/// </summary>
 	/// <remarks>
-	/// http://www.winpcap.org/ntar/draft/PCAP-DumpFileFormat.html
+	/// Implemented according to the draft specification at http://www.winpcap.org/ntar/draft/PCAP-DumpFileFormat.html.
 	/// </remarks>
 	public class Reader
 	{
 		private BinaryReader reader;
 		private FileStream stream;
 
+		/// <summary>
+		/// Get all blocks of all types upcast to the base class.
+		/// </summary>		
 		public IEnumerable<BlockBase> AllBlocks
 		{
 			get { return GetAllBlockIterator(); }
 		}
+		/// <summary>
+		/// Get all enhanced packet blocks.
+		/// </summary>
 		public IEnumerable<EnhancedPacketBlock> EnhancedPacketBlocks
 		{
-			get { return GetEnhancedPacketBlockIterator(); }
+			get { return GetIterator<EnhancedPacketBlock>((r) => new EnhancedPacketBlock(r)); }
 		}
+		/// <summary>
+		/// Get the filename of the PCAP-NG file being read.
+		/// </summary>
 		public string Filename { get; private set; }
+		/// <summary>
+		/// Get all interface description blocks.
+		/// </summary>
 		public IEnumerable<InterfaceDescriptionBlock> InterfaceDescriptionBlocks
 		{
-			get { return GetInterfaceDescriptionBlockIterator(); }
+			get { return GetIterator<InterfaceDescriptionBlock>((r) => new InterfaceDescriptionBlock(r)); }
 		}
-		public IEnumerable<InterfaceStatisticsBlock> InterfaceStatisticBlocks
+		/// <summary>
+		/// Get all interface statistics blocks.
+		/// </summary>
+		public IEnumerable<InterfaceStatisticsBlock> InterfaceStatisticsBlocks
 		{
-			get { return GetInterfaceStatisticsBlockIterator(); }
+			get { return GetIterator<InterfaceStatisticsBlock>((r) => new InterfaceStatisticsBlock(r)); }
 		}
+		/// <summary>
+		/// Get all name resolution blocks.
+		/// </summary>
 		public IEnumerable<NameResolutionBlock> NameResolutionBlocks
 		{
-			get { return GetNameResolutionBlockIterator(); }
+			get { return GetIterator<NameResolutionBlock>((r) => new NameResolutionBlock(r)); }
 		}
+		/// <summary>
+		/// Get all packet blocks.
+		/// </summary>
 		public IEnumerable<PacketBlock> PacketBlocks
 		{
-			get { return GetPacketBlockIterator(); }
+			get { return GetIterator<PacketBlock>((r) => new PacketBlock(r)); }
 		}
+		/// <summary>
+		/// Get all section header blocks.
+		/// </summary>
 		public IEnumerable<SectionHeaderBlock> SectionHeaderBlocks
 		{
-			get { return GetSectionHeaderBlockIterator(); }
+			get { return GetIterator<SectionHeaderBlock>((r) => new SectionHeaderBlock(r)); }
 		}
+		/// <summary>
+		/// Get all simple packet blocks.
+		/// </summary>
 		public IEnumerable<SimplePacketBlock> SimplePacketBlocks
 		{
-			get { return GetSimplePacketBlockIterator(); }
+			get { return GetIterator<SimplePacketBlock>((r) => new SimplePacketBlock(r)); }
 		}
 
+		/// <summary>
+		/// Construct a PCAP-NG file reader.
+		/// </summary>
+		/// <param name="filename">The filename of the PCAP-NG file being read.</param>
 		public Reader(string filename)
 		{
 			this.Filename = filename;
@@ -102,7 +133,7 @@ namespace PcapngFile
 			this.Reset();
 		}
 
-		private IEnumerable<EnhancedPacketBlock> GetEnhancedPacketBlockIterator()
+		private IEnumerable<T> GetIterator<T>(Func<BinaryReader,T> blockGenerator)
 		{
 			BlockType readType = BlockType.None;
 			UInt32 blockHeaderLength = BlockBase.BlockTypeLength + BlockBase.BlockTotalLengthLength;
@@ -114,7 +145,7 @@ namespace PcapngFile
 				if (readType == BlockType.EnhancedPacket)
 				{
 					this.stream.Seek(-BlockBase.BlockTypeLength, SeekOrigin.Current);
-					yield return new EnhancedPacketBlock(this.reader);
+					yield return blockGenerator(this.reader);
 				}
 				else
 				{
@@ -125,186 +156,13 @@ namespace PcapngFile
 			while (this.reader.PeekChar() > 0);
 
 			this.Reset();
-		}
+		}		
 
-		private IEnumerable<InterfaceDescriptionBlock> GetInterfaceDescriptionBlockIterator()
-		{
-			BlockType readType = BlockType.None;
-			UInt32 blockHeaderLength = BlockBase.BlockTypeLength + BlockBase.BlockTotalLengthLength;
-			UInt32 totalBlockLength = 0;
-
-			do
-			{
-				readType = (BlockType)this.reader.ReadUInt32();
-				if (readType == BlockType.InterfaceDescription)
-				{
-					this.stream.Seek(-BlockBase.BlockTypeLength, SeekOrigin.Current);
-					yield return new InterfaceDescriptionBlock(this.reader);
-				}
-				else
-				{
-					totalBlockLength = this.reader.ReadUInt32();
-					this.stream.Seek(totalBlockLength - blockHeaderLength, SeekOrigin.Current);
-				}
-			}
-			while (this.reader.PeekChar() > 0);
-
-			this.Reset();
-		}
-
-		private IEnumerable<InterfaceStatisticsBlock> GetInterfaceStatisticsBlockIterator()
-		{
-			BlockType readType = BlockType.None;
-			UInt32 blockHeaderLength = BlockBase.BlockTypeLength + BlockBase.BlockTotalLengthLength;
-			UInt32 totalBlockLength = 0;
-
-			do
-			{
-				readType = (BlockType)this.reader.ReadUInt32();
-				if (readType == BlockType.InterfaceStatistics)
-				{
-					this.stream.Seek(-BlockBase.BlockTypeLength, SeekOrigin.Current);
-					yield return new InterfaceStatisticsBlock(this.reader);
-				}
-				else
-				{
-					totalBlockLength = this.reader.ReadUInt32();
-					this.stream.Seek(totalBlockLength - blockHeaderLength, SeekOrigin.Current);
-				}
-			}
-			while (this.reader.PeekChar() > 0);
-
-			this.Reset();
-		}
-
-		private IEnumerable<NameResolutionBlock> GetNameResolutionBlockIterator()
-		{
-			BlockType readType = BlockType.None;
-			UInt32 blockHeaderLength = BlockBase.BlockTypeLength + BlockBase.BlockTotalLengthLength;
-			UInt32 totalBlockLength = 0;
-
-			do
-			{
-				readType = (BlockType)this.reader.ReadUInt32();
-				if (readType == BlockType.NameResolution)
-				{
-					this.stream.Seek(-BlockBase.BlockTypeLength, SeekOrigin.Current);
-					yield return new NameResolutionBlock(this.reader);
-				}
-				else
-				{
-					totalBlockLength = this.reader.ReadUInt32();
-					this.stream.Seek(totalBlockLength - blockHeaderLength, SeekOrigin.Current);
-				}
-			}
-			while (this.reader.PeekChar() > 0);
-
-			this.Reset();
-		}
-
-		private IEnumerable<PacketBlock> GetPacketBlockIterator()
-		{
-			BlockType readType = BlockType.None;
-			UInt32 blockHeaderLength = BlockBase.BlockTypeLength + BlockBase.BlockTotalLengthLength;
-			UInt32 totalBlockLength = 0;
-
-			do
-			{
-				readType = (BlockType)this.reader.ReadUInt32();
-				if (readType == BlockType.Packet)
-				{
-					this.stream.Seek(-BlockBase.BlockTypeLength, SeekOrigin.Current);
-					yield return new PacketBlock(this.reader);
-				}
-				else
-				{
-					totalBlockLength = this.reader.ReadUInt32();
-					this.stream.Seek(totalBlockLength - blockHeaderLength, SeekOrigin.Current);
-				}
-			}
-			while (this.reader.PeekChar() > 0);
-
-			this.Reset();
-		}
-
-		private IEnumerable<SectionHeaderBlock> GetSectionHeaderBlockIterator()
-		{
-			BlockType readType = BlockType.None;
-			UInt32 blockHeaderLength = BlockBase.BlockTypeLength + BlockBase.BlockTotalLengthLength;
-			UInt32 totalBlockLength = 0;
-
-			do
-			{
-				readType = (BlockType)this.reader.ReadUInt32();
-				if (readType == BlockType.SectionHeader)
-				{
-					this.stream.Seek(-BlockBase.BlockTypeLength, SeekOrigin.Current);
-					yield return new SectionHeaderBlock(this.reader);
-				}
-				else
-				{
-					totalBlockLength = this.reader.ReadUInt32();
-					this.stream.Seek(totalBlockLength - blockHeaderLength, SeekOrigin.Current);
-				}
-			}
-			while (this.reader.PeekChar() > 0);
-
-			this.Reset();
-		}
-
-		private IEnumerable<SimplePacketBlock> GetSimplePacketBlockIterator()
-		{
-			BlockType readType = BlockType.None;
-			UInt32 blockHeaderLength = BlockBase.BlockTypeLength + BlockBase.BlockTotalLengthLength;
-			UInt32 totalBlockLength = 0;
-
-			do
-			{
-				readType = (BlockType)this.reader.ReadUInt32();
-				if (readType == BlockType.SimplePacket)
-				{
-					this.stream.Seek(-BlockBase.BlockTypeLength, SeekOrigin.Current);
-					yield return new SimplePacketBlock(this.reader);
-				}
-				else
-				{
-					totalBlockLength = this.reader.ReadUInt32();
-					this.stream.Seek(totalBlockLength - blockHeaderLength, SeekOrigin.Current);
-				}
-			}
-			while (this.reader.PeekChar() > 0);
-
-			this.Reset();
-		}
-
-		private IEnumerable<T> GetByTypeIterator<T>() where T : BlockBase
-		{			
-			System.Reflection.BindingFlags activatorFlags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
-			BlockType requestType = GetStoreType<T>();
-			BlockType readType = BlockType.None;
-			Type clrType = typeof(T);
-			UInt32 blockHeaderLength = BlockBase.BlockTypeLength + BlockBase.BlockTotalLengthLength;
-			UInt32 totalBlockLength = 0;
-
-			do
-			{
-				readType = (BlockType)this.reader.ReadUInt32();
-				if (readType == requestType)
-				{
-					this.stream.Seek(-BlockBase.BlockTypeLength, SeekOrigin.Current);
-					yield return (T)Activator.CreateInstance(clrType, activatorFlags, null, new object[] { this.reader }, null);
-				}
-				else
-				{
-					totalBlockLength = this.reader.ReadUInt32();
-					this.stream.Seek(totalBlockLength - blockHeaderLength, SeekOrigin.Current);
-				}
-			}
-			while (this.reader.PeekChar() > 0);
-
-			this.Reset();
-		}
-
+		/// <summary>
+		/// Gets the CLR class type from the store type enumeration.
+		/// </summary>
+		/// <param name="value">The store type enumeration.</param>
+		/// <returns>The CLR class type from the store type enumeration.</returns>
 		public Type GetClrType(BlockType value)
 		{
 			switch (value)
@@ -330,6 +188,11 @@ namespace PcapngFile
 			}
 		}
 
+		/// <summary>
+		/// Gets the store type enumeration from the CLR class type.
+		/// </summary>
+		/// <typeparam name="T">The CLR type parameter.</typeparam>
+		/// <returns>The store type enumeration from the CLR class type.</returns>
 		public BlockType GetStoreType<T>() where T : BlockBase
 		{
 			Type clrType = typeof(T);
@@ -364,11 +227,19 @@ namespace PcapngFile
 			throw new ArgumentException("CLR type not mapped to a valid BlockType (typeof(T) = " + typeof(T) + ").");
 		}
 
+		/// <summary>
+		/// Peek the CLR class type value without moving the file cursor.
+		/// </summary>
+		/// <returns>The CLR class type value or null if EOF is reached.</returns>		
 		public Type PeekClrType()
 		{
 			return GetClrType(PeekStoreType());
 		}
 
+		/// <summary>
+		/// Peek the CLR class type value without moving the file cursor.
+		/// </summary>
+		/// <returns>The CLR class type value or <see cref="BlockType.None"/> if EOF is reached.</returns>	
 		public BlockType PeekStoreType()
 		{
 			if (reader.PeekChar() > 0)
@@ -383,6 +254,11 @@ namespace PcapngFile
 			}
 		}
 
+		/// <summary>
+		/// Read the next block from the file cursor upcast to the base class.
+		/// </summary>
+		/// <returns>The next block from the file cursor upcast to the base class.</returns>
+		/// <remarks>The return type will be the base class (<see cref="BlockBaser"/>) but the actual type will be different.</remarks>
 		public BlockBase ReadBlock()
 		{			
 			BlockBase block;
@@ -421,11 +297,22 @@ namespace PcapngFile
 			return block;
 		}
 
+		/// <summary>
+		/// Read the next block from the file cursor cast to the given class.
+		/// </summary>
+		/// <returns>The next block from the file cursor cast to the given class.</returns>
+		/// <typeparam name="T">The expected class type to be read.</typeparam>
+		/// <remarks>
+		/// Make sure to <see cref="PeekClrType"/> first since an incorrect type parameter will result in an <see cref="InvalidCastException"/>.
+		/// </remarks>
 		public T ReadBlock<T>() where T : BlockBase
 		{
 			return (T)ReadBlock();
 		}
 
+		/// <summary>
+		/// Reset the file cursor to the beginning.
+		/// </summary>
 		public void Reset()
 		{
 			this.reader.BaseStream.Seek(0, SeekOrigin.Begin);

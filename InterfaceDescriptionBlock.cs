@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.IO;
 using System.Text;
 
@@ -37,7 +38,7 @@ namespace PcapngFile
 		public int SnapLength { get; private set; }
 		public long Speed { get; private set; }
 		public long TimeOffsetSeconds { get; private set; }
-		public byte[] TimeZone { get; private set; }
+		public int TimeZone { get; private set; }
 		public byte TimestampResolution { get; private set; }
 
 		internal InterfaceDescriptionBlock(BinaryReader reader)
@@ -61,7 +62,7 @@ namespace PcapngFile
 			{
 				if (value == 0)
 				{
-					return 1000000;	// 10^6
+					return 1000000;	// 10^6 - microsecond
 				}
 				else
 				{
@@ -107,8 +108,8 @@ namespace PcapngFile
 				case TimeOffsetSecondsOptionCode:
 					this.TimeOffsetSeconds = BitConverter.ToInt64(value, 0);
 					break;
-				case TimeZoneOptionCode:
-					this.TimeZone = value;	// TODO Dig into spec and get actual data type.
+				case TimeZoneOptionCode:					
+					this.TimeZone = BitConverter.ToInt32(value, 0);	// GMT offset						
 					break;
 				case TimestampResolutionOptionCode:
 					this.TimestampResolution = value[0];	// TODO Dig into spec and get actual data type.
