@@ -54,7 +54,6 @@
     <Compile Include="Reader.cs" />
     <Compile Include="SectionHeaderBlock.cs" />
     <Compile Include="SimplePacketBlock.cs" />
-    <Compile Include="TimePrecision.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
