@@ -34,3 +34,7 @@ foreach (var block in reader.EnhancedPacketBlocks)
    // Act on received block of type EnhancedPacketBlock.
 }
 ```
+
+## Additional Information
+
+See my <a href="http://awalsh128.blogspot.com/2013/04/pcap-ng-reader-for-net.html">blog post</a> for more information.
