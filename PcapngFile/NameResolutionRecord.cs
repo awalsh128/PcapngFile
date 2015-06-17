@@ -28,14 +28,14 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-using System;
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.IO;
-using System.Text;
-
 namespace PcapngFile
 {
+	using System;
+	using System.Collections.Generic;
+	using System.Collections.ObjectModel;
+	using System.IO;
+	using System.Text;
+
 	public class NameResolutionRecord
 	{
 		private const UInt16 EndRecordType = 0;
@@ -52,14 +52,12 @@ namespace PcapngFile
 
 		internal NameResolutionRecord(BinaryReader reader)
 		{
-			int entriesLength;
-			int remainderLength;
 			UInt16 type = reader.ReadUInt16();
 			int valueLength = reader.ReadUInt16();
 
 			if (type != EndRecordType)
 			{
-				entriesLength = valueLength;
+				int entriesLength = valueLength;
 
 				if (type == Ip6RecordType)
 				{
@@ -75,7 +73,7 @@ namespace PcapngFile
 				}
 				this.DnsEntries = this.ReadDnsEntries(reader, entriesLength);
 
-				remainderLength = valueLength % ValueAlignmentBoundary;
+				int remainderLength = valueLength % ValueAlignmentBoundary;
 				if (remainderLength > 0)
 				{
 					reader.ReadBytes(ValueAlignmentBoundary - remainderLength);		// Read fill bytes to boundary.

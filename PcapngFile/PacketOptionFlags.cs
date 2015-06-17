@@ -28,14 +28,10 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
 namespace PcapngFile
 {
+	using System;
+
 	public class PacketOptionFlags
 	{
 		private const uint InboundMask = 0x00000001;
@@ -55,7 +51,7 @@ namespace PcapngFile
 		private const uint LinkLayerPacketTooLongErrorMask = 0x04000000;
 		private const uint LinkLayerCrcErrorMask = 0x02000000;		
 
-		private uint optionValue;
+		private readonly uint optionValue;
 
 		internal PacketOptionFlags(byte[] optionValue)
 		{

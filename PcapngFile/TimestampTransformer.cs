@@ -28,65 +28,57 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-using System;
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.IO;
-using System.Text;
-
 namespace PcapngFile
 {
-	public class NameResolutionBlock : BlockBase
+	using System;
+
+	internal class TimestampTransformer
 	{
-		private const UInt16 NameServerIp4AddressOptionCode = 3;
-		private const UInt16 NameServerIp6AddressOptionCode = 4;
-		private const UInt16 NameServerNameOptionCode = 2;
+		private const int exponentSignMask = 1 << 7;
+		private const int exponentMask = ~exponentSignMask;
 
-		public bool IsIpVersion6
-		{
-			get { return this.NameServerIp4Address == null; }
-		}
-		public byte[] NameServerIp4Address { get; private set; }
-		public byte[] NameServerIp6Address { get; private set; }
-		public string NameServerName { get; private set; }		
-		public ReadOnlyCollection<NameResolutionRecord> Records { get; private set; }
+		private static readonly long UnixEpochTicks = new DateTime(1970, 1, 1).Ticks;
 
-		internal NameResolutionBlock(BinaryReader reader)
-			: base(reader)
+		private readonly long operand;
+		private readonly bool operandIsMultiplier;
+
+		internal bool PrecisionLoss
 		{
-			this.Records = this.ReadRecords(reader);
-			this.ReadOptions(reader);
-			this.ReadClosingField(reader);
+			get { return !this.operandIsMultiplier; }
 		}
 
-		override protected void OnReadOptionsCode(UInt16 code, byte[] value)
+		public TimestampTransformer(byte resolution = 6)
 		{
-			switch (code)
+			// TODO Support GMT offset.
+			int exponent = resolution & exponentMask;
+			if ((resolution & exponentSignMask) == 0)
 			{
-				case NameServerIp4AddressOptionCode:
-					this.NameServerIp4Address = value;
-					break;
-				case NameServerIp6AddressOptionCode:
-					this.NameServerIp6Address = value;
-					break;
-				case NameServerNameOptionCode:
-					this.NameServerName = UTF8Encoding.UTF8.GetString(value);
-					break;
+				// Base 10				
+				if (exponent <= 7)
+				{
+					this.operandIsMultiplier = true;
+					this.operand = (long)Math.Pow(10.0, 7 - exponent);
+				}
+				else
+				{
+					this.operandIsMultiplier = false;
+					this.operand = (long)Math.Pow(10.0, exponent - 7);
+				}
+			}
+			else
+			{
+				// Base 2				
+				throw new NotImplementedException("Transformation of timestamps in base 2 resolution is not supported.");
 			}
 		}
 
-		private ReadOnlyCollection<NameResolutionRecord> ReadRecords(BinaryReader reader)
+		internal DateTime ToDateTime(long value)
 		{
-			var records = new List<NameResolutionRecord>();
-			NameResolutionRecord record;
-			do
+			if (this.operandIsMultiplier)
 			{
-				record = new NameResolutionRecord(reader);
-				records.Add(record);
-			} 
-			while (record.IpAddress != null);
-
-			return new ReadOnlyCollection<NameResolutionRecord>(records);
+				return new DateTime(UnixEpochTicks + (this.operand * value));
+			}
+			return new DateTime(UnixEpochTicks + (value / this.operand));
 		}
 	}
 }

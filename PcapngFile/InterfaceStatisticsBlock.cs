@@ -28,36 +28,36 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-using System;
-using System.Collections.ObjectModel;
-using System.IO;
-
 namespace PcapngFile
 {
-	public class PacketBlock : BlockBase
-	{
-		private const UInt16 FlagsOptionCode = 2;
-		private const UInt16 HashOptionCode = 3;		
-	
-		public UInt32 CapturedLength { get; private set; }
-		public byte[] Data { get; private set; }
-		public UInt32 DataLength { get; private set; }		
-		public UInt16 DropsCount { get; private set; }
-		public PacketOptionFlags Flags { get; private set; }
-		public byte[] Hash { get; private set; }
-		public HashAlgorithm HashAlgorithm { get; private set; }
-		public UInt16 InterfaceID { get; private set; }		
-		public DateTime Timestamp { get; private set; }
+	using System;
+	using System.IO;
 
-		internal PacketBlock(BinaryReader reader)
+	public class InterfaceStatisticsBlock : BlockBase
+	{
+		private const UInt16 EndTimeOptionCode = 3;
+		private const UInt16 PacketsDroppedOptionCode = 5;
+		private const UInt16 PacketsFilterAcceptOptionCode = 6;
+		private const UInt16 PacketsOsDroppedOptionCode = 7;
+		private const UInt16 PacketsReceivedOptionCode = 4;
+		private const UInt16 StartTimeOptionCode = 2;
+		private const UInt16 TotalPacketsSentOptionCode = 8;
+
+		public long EndTime { get; private set; }
+		public int InterfaceID { get; private set; }
+		public long PacketsDropped { get; private set; }
+		public long PacketsFilterAccept { get; private set; }
+		public long PacketsOsDropped { get; private set; }
+		public long PacketsReceived { get; private set; }
+		public long StartTime { get; private set; }
+		public long Timestamp { get; private set; }		
+		public long TotalPacketsSent { get; private set; }		
+
+		internal InterfaceStatisticsBlock(BinaryReader reader)
 			: base(reader)
 		{
-			this.InterfaceID = reader.ReadUInt16();
-			this.DropsCount = reader.ReadUInt16();
-			this.Timestamp = DateTime.FromBinary(reader.ReadInt64());
-			this.CapturedLength = reader.ReadUInt32();
-			this.DataLength = reader.ReadUInt32();
-			this.Data = reader.ReadBytes((int)this.CapturedLength);
+			this.InterfaceID = reader.ReadInt32();
+			this.Timestamp = reader.ReadInt64();
 			this.ReadOptions(reader);
 			this.ReadClosingField(reader);
 		}
@@ -66,12 +66,26 @@ namespace PcapngFile
 		{
 			switch (code)
 			{
-				case FlagsOptionCode:
-					this.Flags = new PacketOptionFlags(value);
+				case EndTimeOptionCode:
+					this.EndTime = BitConverter.ToInt64(value, 0);
 					break;
-				case HashOptionCode:
-					this.HashAlgorithm = (HashAlgorithm)value[0];
-					Array.Copy(value, 1, this.Hash, 0, value.Length - 1);
+				case PacketsDroppedOptionCode:
+					this.PacketsDropped = BitConverter.ToInt64(value, 0);
+					break;
+				case PacketsFilterAcceptOptionCode:
+					this.PacketsFilterAccept = BitConverter.ToInt64(value, 0);
+					break;
+				case PacketsOsDroppedOptionCode:
+					this.PacketsOsDropped = BitConverter.ToInt64(value, 0);
+					break;
+				case PacketsReceivedOptionCode:
+					this.PacketsReceived = BitConverter.ToInt64(value, 0);
+					break;
+				case StartTimeOptionCode:
+					this.StartTime = BitConverter.ToInt64(value, 0);
+					break;
+				case TotalPacketsSentOptionCode:
+					this.TotalPacketsSent = BitConverter.ToInt64(value, 0);
 					break;
 			}
 		}

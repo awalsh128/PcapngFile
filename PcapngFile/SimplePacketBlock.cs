@@ -28,52 +28,22 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-using System;
-using System.Collections.ObjectModel;
-using System.IO;
-using System.Text;
-
 namespace PcapngFile
 {
-	public class SectionHeaderBlock : BlockBase
-	{		
-		private const UInt16 HardwareOptionCode = 2;
-		private const UInt16 OperatingSystemOptionCode = 3;
-		private const UInt16 UserApplicationOptionCode = 4;
+	using System;
+	using System.IO;
 
-		public UInt32 ByteOrderMagic { get; private set; }		
-		public string Hardware { get; private set; }
-		public UInt16 MajorVersion { get; private set; }
-		public UInt16 MinorVersion { get; private set; }
-		public string OperatingSystem { get; private set; }
-		public Int64 SectionLength { get; private set; }
-		public string UserApplication { get; private set; }
+	public class SimplePacketBlock : BlockBase
+	{						
+		public byte[] Data { get; private set; }
+		public UInt32 DataLength { get; private set; }
 
-		internal SectionHeaderBlock(BinaryReader reader)
+		internal SimplePacketBlock(BinaryReader reader)
 			: base(reader)
-		{
-			this.ByteOrderMagic = reader.ReadUInt32();
-			this.MajorVersion = reader.ReadUInt16();
-			this.MinorVersion = reader.ReadUInt16();
-			this.SectionLength = reader.ReadInt64();
-			this.ReadOptions(reader);			
+		{			
+			this.DataLength = reader.ReadUInt32();
+			this.Data = reader.ReadBytes((int)this.TotalLength - 16);	// 4 fields x 4 bytes			
 			this.ReadClosingField(reader);
-		}
-
-		override protected void OnReadOptionsCode(UInt16 code, byte[] value)
-		{
-			switch (code)
-			{				
-				case HardwareOptionCode:
-					this.Hardware = UTF8Encoding.UTF8.GetString(value);
-					break;
-				case OperatingSystemOptionCode:
-					this.OperatingSystem = UTF8Encoding.UTF8.GetString(value);
-					break;
-				case UserApplicationOptionCode:
-					this.UserApplication = UTF8Encoding.UTF8.GetString(value);
-					break;
-			}
-		}
+		}		
 	}
 }

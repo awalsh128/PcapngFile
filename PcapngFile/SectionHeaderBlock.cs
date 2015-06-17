@@ -28,65 +28,49 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-using System;
-using System.Collections.ObjectModel;
-using System.IO;
-
 namespace PcapngFile
 {
-	public class InterfaceStatisticsBlock : BlockBase
-	{
-		private const UInt16 EndTimeOptionCode = 3;
-		private const UInt16 PacketsDroppedOptionCode = 5;
-		private const UInt16 PacketsFilterAcceptOptionCode = 6;
-		private const UInt16 PacketsOsDroppedOptionCode = 7;
-		private const UInt16 PacketsReceivedOptionCode = 4;
-		private const UInt16 StartTimeOptionCode = 2;
-		private const UInt16 TotalPacketsSentOptionCode = 8;
+	using System;
+	using System.IO;
+	using System.Text;
 
-		public long EndTime { get; private set; }
-		public int InterfaceID { get; private set; }
-		public long PacketsDropped { get; private set; }
-		public long PacketsFilterAccept { get; private set; }
-		public long PacketsOsDropped { get; private set; }
-		public long PacketsReceived { get; private set; }
-		public long StartTime { get; private set; }
-		public long Timestamp { get; private set; }		
-		public long TotalPacketsSent { get; private set; }		
+	public class SectionHeaderBlock : BlockBase
+	{		
+		private const UInt16 HardwareOptionCode = 2;
+		private const UInt16 OperatingSystemOptionCode = 3;
+		private const UInt16 UserApplicationOptionCode = 4;
 
-		internal InterfaceStatisticsBlock(BinaryReader reader)
+		public UInt32 ByteOrderMagic { get; private set; }		
+		public string Hardware { get; private set; }
+		public UInt16 MajorVersion { get; private set; }
+		public UInt16 MinorVersion { get; private set; }
+		public string OperatingSystem { get; private set; }
+		public Int64 SectionLength { get; private set; }
+		public string UserApplication { get; private set; }
+
+		internal SectionHeaderBlock(BinaryReader reader)
 			: base(reader)
 		{
-			this.InterfaceID = reader.ReadInt32();
-			this.Timestamp = reader.ReadInt64();
-			this.ReadOptions(reader);
+			this.ByteOrderMagic = reader.ReadUInt32();
+			this.MajorVersion = reader.ReadUInt16();
+			this.MinorVersion = reader.ReadUInt16();
+			this.SectionLength = reader.ReadInt64();
+			this.ReadOptions(reader);			
 			this.ReadClosingField(reader);
 		}
 
 		override protected void OnReadOptionsCode(UInt16 code, byte[] value)
 		{
 			switch (code)
-			{
-				case EndTimeOptionCode:
-					this.EndTime = BitConverter.ToInt64(value, 0);
+			{				
+				case HardwareOptionCode:
+					this.Hardware = Encoding.UTF8.GetString(value);
 					break;
-				case PacketsDroppedOptionCode:
-					this.PacketsDropped = BitConverter.ToInt64(value, 0);
+				case OperatingSystemOptionCode:
+					this.OperatingSystem = Encoding.UTF8.GetString(value);
 					break;
-				case PacketsFilterAcceptOptionCode:
-					this.PacketsFilterAccept = BitConverter.ToInt64(value, 0);
-					break;
-				case PacketsOsDroppedOptionCode:
-					this.PacketsOsDropped = BitConverter.ToInt64(value, 0);
-					break;
-				case PacketsReceivedOptionCode:
-					this.PacketsReceived = BitConverter.ToInt64(value, 0);
-					break;
-				case StartTimeOptionCode:
-					this.StartTime = BitConverter.ToInt64(value, 0);
-					break;
-				case TotalPacketsSentOptionCode:
-					this.TotalPacketsSent = BitConverter.ToInt64(value, 0);
+				case UserApplicationOptionCode:
+					this.UserApplication = Encoding.UTF8.GetString(value);
 					break;
 			}
 		}

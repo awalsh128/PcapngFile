@@ -28,15 +28,13 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-using System;
-using System.Collections.ObjectModel;
-using System.IO;
-using System.Text;
-
 namespace PcapngFile
 {
+	using System;
+	using System.IO;	
+
 	public class EnhancedPacketBlock : BlockBase
-	{		
+	{				
 		private const int DataAlignmentBoundary = 4;
 		private const UInt16 DropCountOptionCode = 4;
 		private const UInt32 DropCountOptionHeader = (DropCountOptionCode << 16) | 8;
@@ -44,36 +42,42 @@ namespace PcapngFile
 		private const UInt32 FlagsOptionHeader = (FlagsOptionCode << 16) | 4;
 		private const UInt16 HashOptionCode = 3;
 		//private const UInt32 HashOptionHeader = (HashOptionCode << 16) | <variable depending on code>
-		private const int HeaderAndFooterLength = (7 * 4) + BlockTotalLengthLength;	// 7 4-byte header fields + 1 4-byte footer field
+		private const int HeaderAndFooterLength = (7 * 4) + BlockTotalLengthLength; // 7 4-byte header fields + 1 4-byte footer field
 
-		public int CapturedLength { get; private set; }		
+		public int CapturedLength { get; private set; }
+
 		public byte[] Data { get; private set; }
+
 		public int DataLength { get; private set; }
-		public long DropCount { get; private set; }		
+
+		public long DropCount { get; private set; }
+
 		public byte[] Hash { get; private set; }
+
 		public HashAlgorithm HashAlgorithm { get; private set; }
+
 		public int InterfaceID { get; private set; }
+
 		public PacketOptionFlags Flags { get; private set; }
+
 		public long Timestamp { get; private set; }
 
 		internal EnhancedPacketBlock(BinaryReader reader)
 			: base(reader)
 		{
-			int paddingLength;
-			int remainderLength;
 			int totalExceptOptionLength;
 
 			this.InterfaceID = reader.ReadInt32();
-			this.Timestamp = reader.ReadInt64();
+			this.Timestamp = GetTimestamp(reader);
 			this.CapturedLength = reader.ReadInt32();
 			this.DataLength = reader.ReadInt32();
-			this.Data = reader.ReadBytes((int)this.CapturedLength);
+			this.Data = reader.ReadBytes(this.CapturedLength);
 
-			remainderLength = (int)this.DataLength % DataAlignmentBoundary;
+			int remainderLength = this.DataLength % DataAlignmentBoundary;
 			if (remainderLength > 0)
 			{
-				paddingLength = DataAlignmentBoundary - remainderLength;				
-				reader.ReadBytes(paddingLength);				
+				int paddingLength = DataAlignmentBoundary - remainderLength;
+				reader.ReadBytes(paddingLength);
 				totalExceptOptionLength = HeaderAndFooterLength + this.CapturedLength + paddingLength;
 			}
 			else
@@ -88,15 +92,55 @@ namespace PcapngFile
 			this.ReadClosingField(reader);
 		}
 
-		public DateTime GetTimestamp(InterfaceDescriptionBlock block)
+		private static long GetTimestamp(BinaryReader reader)
 		{
-			return DateTime.FromBinary(this.Timestamp / block.GetTimePrecisionDivisor());
+			if (BitConverter.IsLittleEndian)
+			{
+				var high = reader.ReadBytes(4);
+				var low = reader.ReadBytes(4);
+				var ordered = new byte[8];
+
+				Buffer.BlockCopy(low, 0, ordered, 0, 4);
+				Buffer.BlockCopy(high, 0, ordered, 4, 4);
+				return BitConverter.ToInt64(ordered, 0);
+			}
+			return reader.ReadInt64();
+		}
+
+		/// <summary>
+		/// Gets the <see cref="DateTime"/> equivalent of the <see cref="Timestamp"/> assuming default resolution.
+		/// </summary>				
+		/// <returns>The <see cref="DateTime"/> equivalent of the <see cref="Timestamp"/> assuming default resolution.</returns>
+		public DateTime GetTimestamp()
+		{
+			return InterfaceDescriptionBlock.DefaultTimestampTransformer.ToDateTime(this.Timestamp);
+		}
+
+		/// <summary>
+		/// Gets the <see cref="DateTime"/> equivalent of the <see cref="Timestamp"/>.
+		/// </summary>
+		/// <param name="block">The <see cref="InterfaceDescriptionBlock"/> used to determine the resolution of the <see cref="Timestamp"/>.</param>
+		/// <param name="precisionLoss">True if there was precision loss during the transformation.</param>
+		/// <returns>The <see cref="DateTime"/> equivalent of the <see cref="Timestamp"/>.</returns>
+		public DateTime GetTimestamp(InterfaceDescriptionBlock block, out bool precisionLoss)
+		{
+			TimestampTransformer transformer;
+			try
+			{
+				transformer = block.GetTimestampTransformer();
+			}
+			catch (NotImplementedException ex)
+			{
+				throw new NotSupportedException(ex.Message, ex);
+			}
+			precisionLoss = transformer.PrecisionLoss;
+			return transformer.ToDateTime(this.Timestamp);
 		}
 
 		protected override void OnReadOptionsCode(UInt16 code, byte[] value)
 		{
 			switch (code)
-			{				
+			{
 				case DropCountOptionCode:
 					this.DropCount = BitConverter.ToInt64(value, 0);
 					break;
@@ -109,47 +153,5 @@ namespace PcapngFile
 					break;
 			}
 		}
-
-		//protected override void OnSerialize(StreamWriter writer)
-		//{
-		//	int paddingLength;
-		//	bool optionWritten;
-		//	int remainderLength;
-
-		//	writer.Write(this.InterfaceID);
-		//	writer.Write(this.Timestamp);
-		//	writer.Write(this.CapturedLength);
-		//	writer.Write(this.DataLength);
-		//	writer.Write(this.Data);
-			
-		//	remainderLength = (int)this.DataLength % DataAlignmentBoundary;
-		//	if (remainderLength > 0)
-		//	{
-		//		paddingLength = DataAlignmentBoundary - remainderLength;
-		//		writer.Write(new byte[paddingLength]);				
-		//	}
-
-		//	optionWritten = false;
-		//	if (this.Flags != null)
-		//	{
-		//		writer.Write(FlagsOptionHeader);				
-		//		writer.Write(this.Flags.GetOptionValue());
-		//		optionWritten = true;
-		//	}
-		//	if (this.HashAlgorithm != PcapngFile.HashAlgorithm.None)
-		//	{				
-		//		writer.Write(this.GetHashAlgorithmCode(this.HashAlgorithm));
-		//		optionWritten = true;
-		//	}
-		//	if (this.DropCount > 0)
-		//	{
-		//		writer.Write(this.DropCount);
-		//		optionWritten = true;
-		//	}
-		//	if (optionWritten)
-		//	{
-		//		writer.Write(EndOptionField);
-		//	}
-		//}
 	}
 }

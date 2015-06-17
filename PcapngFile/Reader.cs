@@ -28,16 +28,13 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Runtime.InteropServices;
-using System.Text;
-using System.Threading.Tasks;
-
 namespace PcapngFile
 {
+	using System;
+	using System.Collections.Generic;
+	using System.IO;
+	using System.Text;
+
 	/// <summary>
 	/// Reads PCAP Next Generation files and generates CLR objects from its data.
 	/// </summary>
@@ -46,8 +43,8 @@ namespace PcapngFile
 	/// </remarks>
 	public class Reader
 	{
-		private BinaryReader reader;
-		private FileStream stream;
+		private readonly BinaryReader reader;
+		private readonly FileStream stream;
 
 		/// <summary>
 		/// Get all blocks of all types upcast to the base class.
@@ -61,7 +58,7 @@ namespace PcapngFile
 		/// </summary>
 		public IEnumerable<EnhancedPacketBlock> EnhancedPacketBlocks
 		{
-			get { return GetIterator<EnhancedPacketBlock>((r) => new EnhancedPacketBlock(r)); }
+			get { return GetIterator(r => new EnhancedPacketBlock(r), BlockType.EnhancedPacket); }
 		}
 		/// <summary>
 		/// Get the filename of the PCAP-NG file being read.
@@ -72,42 +69,42 @@ namespace PcapngFile
 		/// </summary>
 		public IEnumerable<InterfaceDescriptionBlock> InterfaceDescriptionBlocks
 		{
-			get { return GetIterator<InterfaceDescriptionBlock>((r) => new InterfaceDescriptionBlock(r)); }
+			get { return GetIterator(r => new InterfaceDescriptionBlock(r), BlockType.InterfaceDescription); }
 		}
 		/// <summary>
 		/// Get all interface statistics blocks.
 		/// </summary>
 		public IEnumerable<InterfaceStatisticsBlock> InterfaceStatisticsBlocks
 		{
-			get { return GetIterator<InterfaceStatisticsBlock>((r) => new InterfaceStatisticsBlock(r)); }
+			get { return GetIterator(r => new InterfaceStatisticsBlock(r), BlockType.InterfaceStatistics); }
 		}
 		/// <summary>
 		/// Get all name resolution blocks.
 		/// </summary>
 		public IEnumerable<NameResolutionBlock> NameResolutionBlocks
 		{
-			get { return GetIterator<NameResolutionBlock>((r) => new NameResolutionBlock(r)); }
+			get { return GetIterator(r => new NameResolutionBlock(r), BlockType.NameResolution); }
 		}
 		/// <summary>
 		/// Get all packet blocks.
 		/// </summary>
 		public IEnumerable<PacketBlock> PacketBlocks
 		{
-			get { return GetIterator<PacketBlock>((r) => new PacketBlock(r)); }
+			get { return GetIterator(r => new PacketBlock(r), BlockType.Packet); }
 		}
 		/// <summary>
 		/// Get all section header blocks.
 		/// </summary>
 		public IEnumerable<SectionHeaderBlock> SectionHeaderBlocks
 		{
-			get { return GetIterator<SectionHeaderBlock>((r) => new SectionHeaderBlock(r)); }
+			get { return GetIterator(r => new SectionHeaderBlock(r), BlockType.SectionHeader); }
 		}
 		/// <summary>
 		/// Get all simple packet blocks.
 		/// </summary>
 		public IEnumerable<SimplePacketBlock> SimplePacketBlocks
 		{
-			get { return GetIterator<SimplePacketBlock>((r) => new SimplePacketBlock(r)); }
+			get { return GetIterator(r => new SimplePacketBlock(r), BlockType.SimplePacket); }
 		}
 
 		/// <summary>
@@ -123,7 +120,7 @@ namespace PcapngFile
 
 		private IEnumerable<BlockBase> GetAllBlockIterator()
 		{
-			BlockType type = BlockType.None;
+			BlockType type;
 
 			do
 			{
@@ -163,23 +160,21 @@ namespace PcapngFile
 			this.Reset();
 		}
 
-		private IEnumerable<T> GetIterator<T>(Func<BinaryReader,T> blockGenerator)
+		private IEnumerable<T> GetIterator<T>(Func<BinaryReader,T> blockGenerator, BlockType iteratorBlockType)
 		{
-			BlockType readType = BlockType.None;
-			UInt32 blockHeaderLength = BlockBase.BlockTypeLength + BlockBase.BlockTotalLengthLength;
-			UInt32 totalBlockLength = 0;
+			const uint blockHeaderLength = BlockBase.BlockTypeLength + BlockBase.BlockTotalLengthLength;
 
 			do
 			{
-				readType = (BlockType)this.reader.ReadUInt32();
-				if (readType == BlockType.EnhancedPacket)
+				var readType = (BlockType)this.reader.ReadUInt32();				
+				if (readType == iteratorBlockType)
 				{
 					this.stream.Seek(-BlockBase.BlockTypeLength, SeekOrigin.Current);
 					yield return blockGenerator(this.reader);
 				}
 				else
 				{
-					totalBlockLength = this.reader.ReadUInt32();
+					UInt32 totalBlockLength = this.reader.ReadUInt32();
 					this.stream.Seek(totalBlockLength - blockHeaderLength, SeekOrigin.Current);
 				}
 			}
@@ -274,7 +269,7 @@ namespace PcapngFile
 		{
 			if (reader.PeekChar() > 0)
 			{
-				BlockType type = (BlockType)this.reader.ReadUInt32();
+				var type = (BlockType)this.reader.ReadUInt32();
 				this.stream.Seek(-BlockBase.BlockTypeLength, SeekOrigin.Current);
 				return type;
 			}
@@ -288,7 +283,7 @@ namespace PcapngFile
 		/// Read the next block from the file cursor upcast to the base class.
 		/// </summary>
 		/// <returns>The next block from the file cursor upcast to the base class.</returns>
-		/// <remarks>The return type will be the base class (<see cref="BlockBaser"/>) but the actual type will be different.</remarks>
+		/// <remarks>The return type will be the base class (<see cref="BlockBase"/>) but the actual type will be different.</remarks>
 		public BlockBase ReadBlock()
 		{			
 			BlockBase block;
