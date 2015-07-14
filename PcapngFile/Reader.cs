@@ -41,7 +41,7 @@ namespace PcapngFile
 	/// <remarks>
 	/// Implemented according to the draft specification at http://www.winpcap.org/ntar/draft/PCAP-DumpFileFormat.html.
 	/// </remarks>
-	public class Reader
+	public class Reader : IDisposable
 	{
 		private readonly BinaryReader reader;
 		private readonly FileStream stream;
@@ -116,6 +116,11 @@ namespace PcapngFile
 			this.Filename = filename;
 			this.stream = new FileStream(filename, FileMode.Open);
 			this.reader = new BinaryReader(this.stream, Encoding.UTF8);			
+		}
+
+		public void Dispose()
+		{
+			reader.Dispose();
 		}
 
 		private IEnumerable<BlockBase> GetAllBlockIterator()
