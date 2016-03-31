@@ -6,9 +6,9 @@ using System.Runtime.InteropServices;
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
 [assembly: AssemblyTitle("PCAP-NG File Reader")]
-[assembly: AssemblyDescription("Library for reading PCAP-NG format files.")]
+[assembly: AssemblyDescription("Reads PCAP Next Generation files and generates CLR objects from its data. Implemented according to the draft specification at http://www.winpcap.org/ntar/draft/PCAP-DumpFileFormat.html.")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("Awalsh128")]
+[assembly: AssemblyCompany("Andrew Walsh")]
 [assembly: AssemblyProduct("PcapngFile")]
 [assembly: AssemblyCopyright("Copyright © 2016")]
 [assembly: AssemblyTrademark("")]
