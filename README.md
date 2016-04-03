@@ -37,6 +37,9 @@ using (var reader = new Reader("myfile.pcapng"))
 }
 ```
 
+## Install NuGet Package
+<pre><code>PM&gt; Install-Package PcapngFile </code></pre>
+
 ## Additional Information
 
 See my <a href="http://awalsh128.blogspot.com/2013/04/pcap-ng-reader-for-net.html">blog post</a> for more information.
