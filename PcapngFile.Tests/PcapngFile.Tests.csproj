@@ -44,9 +44,7 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="TestFile1.pcapng">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
+    <EmbeddedResource Include="TestFile1.pcapng" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\PcapngFile\PcapngFile.csproj">
