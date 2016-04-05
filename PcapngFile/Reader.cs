@@ -39,7 +39,7 @@ namespace PcapngFile
 	public class Reader : IDisposable
 	{
 		private readonly BinaryReader reader;
-		private readonly FileStream stream;
+		private readonly Stream stream;
 
 		/// <summary>
 		/// Get all blocks of all types upcast to the base class.
@@ -54,11 +54,7 @@ namespace PcapngFile
 		public IEnumerable<EnhancedPacketBlock> EnhancedPacketBlocks
 		{
 			get { return GetIterator(r => new EnhancedPacketBlock(r), BlockType.EnhancedPacket); }
-		}
-		/// <summary>
-		/// Get the filename of the PCAP-NG file being read.
-		/// </summary>
-		public string Filename { get; private set; }
+		}		
 		/// <summary>
 		/// Get all interface description blocks.
 		/// </summary>
@@ -102,18 +98,26 @@ namespace PcapngFile
 			get { return GetIterator(r => new SimplePacketBlock(r), BlockType.SimplePacket); }
 		}
 
-		/// <summary>
-		/// Construct a PCAP-NG file reader.
+        /// <summary>
+        /// Construct a PCAP-NG file reader from a given stream.
+        /// </summary>
+        /// <param name="stream">The stream of the PCAP-NG file being read.</param>
+        /// <param name="leaveOpen">Leave stream open on reader <see cref="Dispose"/>.</param>
+        public Reader(Stream stream, bool leaveOpen = false)            
+		{
+            this.stream = stream;
+			this.reader = new BinaryReader(this.stream, Encoding.UTF8, leaveOpen);
+		}
+
+        /// <summary>
+		/// Construct a PCAP-NG file reader from a given file name.
 		/// </summary>
 		/// <param name="filename">The filename of the PCAP-NG file being read.</param>
 		public Reader(string filename)
-		{
-			this.Filename = filename;
-			this.stream = new FileStream(filename, FileMode.Open);
-			this.reader = new BinaryReader(this.stream, Encoding.UTF8);			
-		}
+            : this(new FileStream(filename, FileMode.Open), false)
+        { }
 
-		public void Dispose()
+        public void Dispose()
 		{
 			reader.Dispose();
 		}
