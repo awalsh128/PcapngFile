@@ -65,7 +65,7 @@ namespace PcapngFile
 					this.NameServerIp6Address = value;
 					break;
 				case NameServerNameOptionCode:
-					this.NameServerName = UTF8Encoding.UTF8.GetString(value);
+					this.NameServerName = Encoding.UTF8.GetString(value);
 					break;
 			}
 		}
