@@ -346,5 +346,7 @@ namespace PcapngFile
 		{
 			this.reader.BaseStream.Seek(0, SeekOrigin.Begin);
 		}
+
+        public float CurrentPos => reader.BaseStream.Position * 1.0f / reader.BaseStream.Length;
 	}
 }
