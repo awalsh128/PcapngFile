@@ -37,12 +37,9 @@ namespace PcapngFile
 		private readonly long operand;
 		private readonly bool operandIsMultiplier;
 
-		internal bool PrecisionLoss
-		{
-			get { return !this.operandIsMultiplier; }
-		}
+		internal bool PrecisionLoss => !this.operandIsMultiplier;
 
-		public TimestampTransformer(byte resolution = 6)
+	    public TimestampTransformer(byte resolution = 6)
 		{
 			// TODO Support GMT offset.
 			int exponent = resolution & exponentMask;

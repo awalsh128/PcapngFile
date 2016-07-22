@@ -37,11 +37,9 @@ namespace PcapngFile
 		private const UInt16 NameServerIp6AddressOptionCode = 4;
 		private const UInt16 NameServerNameOptionCode = 2;
 
-		public bool IsIpVersion6
-		{
-			get { return this.NameServerIp4Address == null; }
-		}
-		public byte[] NameServerIp4Address { get; private set; }
+		public bool IsIpVersion6 => this.NameServerIp4Address == null;
+
+	    public byte[] NameServerIp4Address { get; private set; }
 		public byte[] NameServerIp6Address { get; private set; }
 		public string NameServerName { get; private set; }		
 		public ReadOnlyCollection<NameResolutionRecord> Records { get; private set; }
@@ -54,7 +52,7 @@ namespace PcapngFile
 			this.ReadClosingField(reader);
 		}
 
-		override protected void OnReadOptionsCode(UInt16 code, byte[] value)
+		protected override void OnReadOptionsCode(UInt16 code, byte[] value)
 		{
 			switch (code)
 			{

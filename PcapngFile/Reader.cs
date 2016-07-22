@@ -37,24 +37,23 @@ namespace PcapngFile
 	/// Implemented according to the draft specification at http://www.winpcap.org/ntar/draft/PCAP-DumpFileFormat.html.
 	/// </remarks>
 	public class Reader : IDisposable
-	{
+	{        
 		private readonly BinaryReader reader;
 		private readonly Stream stream;
 
 		/// <summary>
 		/// Get all blocks of all types upcast to the base class.
 		/// </summary>		
-		public IEnumerable<BlockBase> AllBlocks
-		{
-			get { return GetAllBlockIterator(); }
-		}
-		/// <summary>
+		public IEnumerable<BlockBase> AllBlocks => this.GetAllBlockIterator();
+
+	    /// <summary>
 		/// Get all enhanced packet blocks.
 		/// </summary>
 		public IEnumerable<EnhancedPacketBlock> EnhancedPacketBlocks
 		{
 			get { return GetIterator(r => new EnhancedPacketBlock(r), BlockType.EnhancedPacket); }
 		}		
+
 		/// <summary>
 		/// Get all interface description blocks.
 		/// </summary>
@@ -62,6 +61,7 @@ namespace PcapngFile
 		{
 			get { return GetIterator(r => new InterfaceDescriptionBlock(r), BlockType.InterfaceDescription); }
 		}
+
 		/// <summary>
 		/// Get all interface statistics blocks.
 		/// </summary>
@@ -69,6 +69,7 @@ namespace PcapngFile
 		{
 			get { return GetIterator(r => new InterfaceStatisticsBlock(r), BlockType.InterfaceStatistics); }
 		}
+
 		/// <summary>
 		/// Get all name resolution blocks.
 		/// </summary>
@@ -76,6 +77,7 @@ namespace PcapngFile
 		{
 			get { return GetIterator(r => new NameResolutionBlock(r), BlockType.NameResolution); }
 		}
+
 		/// <summary>
 		/// Get all packet blocks.
 		/// </summary>
@@ -90,6 +92,7 @@ namespace PcapngFile
 		{
 			get { return GetIterator(r => new SectionHeaderBlock(r), BlockType.SectionHeader); }
 		}
+
 		/// <summary>
 		/// Get all simple packet blocks.
 		/// </summary>
