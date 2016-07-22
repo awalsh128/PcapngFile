@@ -46,10 +46,20 @@ namespace PcapngFile
 		/// </summary>		
 		public IEnumerable<BlockBase> AllBlocks => this.GetAllBlockIterator();
 
-	    /// <summary>
-		/// Get all enhanced packet blocks.
-		/// </summary>
-		public IEnumerable<EnhancedPacketBlock> EnhancedPacketBlocks
+        /// <summary>
+        /// Gets the underlying stream length.
+        /// </summary>
+	    public long? BaseStreamLength => this.stream.CanSeek ? this.stream.Length : (long?)null;
+
+        /// <summary>
+	    /// Gets the underlying stream position.
+	    /// </summary>
+	    public long? BaseStreamPosition => this.stream.CanSeek ? this.stream.Position : (long?)null;
+
+        /// <summary>
+        /// Get all enhanced packet blocks.
+        /// </summary>
+        public IEnumerable<EnhancedPacketBlock> EnhancedPacketBlocks
 		{
 			get { return GetIterator(r => new EnhancedPacketBlock(r), BlockType.EnhancedPacket); }
 		}		
