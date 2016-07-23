@@ -47,8 +47,14 @@ namespace PcapngFile
 		internal NameResolutionBlock(BinaryReader reader)
 			: base(reader)
 		{
-			this.Records = this.ReadRecords(reader);
-			this.ReadOptions(reader);
+			this.Records = this.ReadRecords(reader);           
+             
+            var totalExceptOptionLength = this.GetRemainingLength(reader);
+            if (this.TotalLength != totalExceptOptionLength)
+            {
+                this.ReadOptions(reader);
+            }
+
 			this.ReadClosingField(reader);
 		}
 
@@ -71,13 +77,12 @@ namespace PcapngFile
 		private ReadOnlyCollection<NameResolutionRecord> ReadRecords(BinaryReader reader)
 		{
 			var records = new List<NameResolutionRecord>();
-			NameResolutionRecord record;
-			do
-			{
-				record = new NameResolutionRecord(reader);
-				records.Add(record);
-			} 
-			while (record.IpAddress != null);
+			var record = new NameResolutionRecord(reader);
+            while (record.IpAddress != null)
+            {
+                records.Add(record);
+                record = new NameResolutionRecord(reader);
+			}		
 
 			return new ReadOnlyCollection<NameResolutionRecord>(records);
 		}

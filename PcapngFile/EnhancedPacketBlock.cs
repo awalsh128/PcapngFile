@@ -60,8 +60,6 @@ namespace PcapngFile
 		internal EnhancedPacketBlock(BinaryReader reader)
 			: base(reader)
 		{
-			int totalExceptOptionLength;
-
 			this.InterfaceID = reader.ReadInt32();
 			this.Timestamp = GetTimestamp(reader);
 			this.CapturedLength = reader.ReadInt32();
@@ -73,17 +71,14 @@ namespace PcapngFile
 			{
 				int paddingLength = DataAlignmentBoundary - remainderLength;
 				reader.ReadBytes(paddingLength);
-				totalExceptOptionLength = HeaderAndFooterLength + this.CapturedLength + paddingLength;
 			}
-			else
-			{
-				totalExceptOptionLength = HeaderAndFooterLength + this.CapturedLength;
-			}
-
-			if (this.TotalLength != totalExceptOptionLength)
+			          
+            var totalExceptOptionLength = this.GetRemainingLength(reader);
+            if (this.TotalLength != totalExceptOptionLength)
 			{
 				this.ReadOptions(reader);
 			}
+
 			this.ReadClosingField(reader);
 		}
 

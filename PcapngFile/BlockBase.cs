@@ -99,6 +99,12 @@ namespace PcapngFile
 			}
 		}
 
+        protected long GetRemainingLength(BinaryReader reader)
+        {
+            var readLength = reader.BaseStream.Position - this.PreReadPosition;
+            return readLength + BlockTotalLengthLength;
+        }
+
 		protected virtual void OnReadOptionsCode(UInt16 code, byte[] value)
 		{
 			throw new NotImplementedException("The OnReadOptionsCode must be overriden if ReadOption is called.");
