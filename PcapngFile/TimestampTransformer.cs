@@ -25,52 +25,52 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace PcapngFile
 {
-	using System;
+    using System;
 
-	internal class TimestampTransformer
-	{
-		private const int exponentSignMask = 1 << 7;
-		private const int exponentMask = ~exponentSignMask;
+    internal class TimestampTransformer
+    {
+        private const int exponentSignMask = 1 << 7;
+        private const int exponentMask = ~exponentSignMask;
 
-		private static readonly long UnixEpochTicks = new DateTime(1970, 1, 1).Ticks;
+        private static readonly long UnixEpochTicks = new DateTime(1970, 1, 1).Ticks;
 
-		private readonly long operand;
-		private readonly bool operandIsMultiplier;
+        private readonly long operand;
+        private readonly bool operandIsMultiplier;
 
-		internal bool PrecisionLoss => !this.operandIsMultiplier;
+        internal bool PrecisionLoss => !this.operandIsMultiplier;
 
-	    public TimestampTransformer(byte resolution = 6)
-		{
-			// TODO Support GMT offset.
-			int exponent = resolution & exponentMask;
-			if ((resolution & exponentSignMask) == 0)
-			{
-				// Base 10				
-				if (exponent <= 7)
-				{
-					this.operandIsMultiplier = true;
-					this.operand = (long)Math.Pow(10.0, 7 - exponent);
-				}
-				else
-				{
-					this.operandIsMultiplier = false;
-					this.operand = (long)Math.Pow(10.0, exponent - 7);
-				}
-			}
-			else
-			{
-				// Base 2				
-				throw new NotImplementedException("Transformation of timestamps in base 2 resolution is not supported.");
-			}
-		}
+        public TimestampTransformer(byte resolution = 6)
+        {
+            // TODO Support GMT offset.
+            int exponent = resolution & exponentMask;
+            if ((resolution & exponentSignMask) == 0)
+            {
+                // Base 10				
+                if (exponent <= 7)
+                {
+                    this.operandIsMultiplier = true;
+                    this.operand = (long)Math.Pow(10.0, 7 - exponent);
+                }
+                else
+                {
+                    this.operandIsMultiplier = false;
+                    this.operand = (long)Math.Pow(10.0, exponent - 7);
+                }
+            }
+            else
+            {
+                // Base 2				
+                throw new NotImplementedException("Transformation of timestamps in base 2 resolution is not supported.");
+            }
+        }
 
-		internal DateTime ToDateTime(long value)
-		{
-			if (this.operandIsMultiplier)
-			{
-				return new DateTime(UnixEpochTicks + (this.operand * value));
-			}
-			return new DateTime(UnixEpochTicks + (value / this.operand));
-		}
-	}
+        internal DateTime ToDateTime(long value)
+        {
+            if (this.operandIsMultiplier)
+            {
+                return new DateTime(UnixEpochTicks + (this.operand * value));
+            }
+            return new DateTime(UnixEpochTicks + (value / this.operand));
+        }
+    }
 }
