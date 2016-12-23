@@ -66,7 +66,7 @@ namespace PcapngFile
             this.DataLength = reader.ReadInt32();
             this.Data = reader.ReadBytes(this.CapturedLength);
 
-            int remainderLength = this.DataLength % DataAlignmentBoundary;
+            int remainderLength = this.CapturedLength % DataAlignmentBoundary;
             if (remainderLength > 0)
             {
                 int paddingLength = DataAlignmentBoundary - remainderLength;
@@ -99,7 +99,7 @@ namespace PcapngFile
 
         /// <summary>
         /// Gets the <see cref="DateTime"/> equivalent of the <see cref="Timestamp"/> assuming default resolution.
-        /// </summary>				
+        /// </summary>
         /// <returns>The <see cref="DateTime"/> equivalent of the <see cref="Timestamp"/> assuming default resolution.</returns>
         public DateTime GetTimestamp()
         {
