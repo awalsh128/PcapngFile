@@ -85,7 +85,7 @@ namespace PcapngFile
             this.LinkType = (LinkType)reader.ReadUInt16();
             reader.ReadUInt16(); // Reserved field.
             this.SnapLength = reader.ReadInt32();
-            this.ReadOptions(reader);
+            this.TryReadOptions(reader);
             this.ReadClosingField(reader);
             this.timestampTransformer = null;
         }
@@ -133,7 +133,7 @@ namespace PcapngFile
                     this.TimeOffsetSeconds = BitConverter.ToInt64(value, 0);
                     break;
                 case TimeZoneOptionCode:
-                    this.TimeZone = BitConverter.ToInt32(value, 0); // GMT offset						
+                    this.TimeZone = BitConverter.ToInt32(value, 0); // GMT offset
                     break;
                 case TimestampResolutionOptionCode:
                     this.TimestampResolution = value[0]; // TODO Dig into spec and get actual data type.

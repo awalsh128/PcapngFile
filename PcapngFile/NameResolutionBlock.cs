@@ -48,13 +48,7 @@ namespace PcapngFile
             : base(reader)
         {
             this.Records = this.ReadRecords(reader);
-
-            var totalExceptOptionLength = this.GetRemainingLength(reader);
-            if (this.TotalLength != totalExceptOptionLength)
-            {
-                this.ReadOptions(reader);
-            }
-
+            this.TryReadOptions(reader);
             this.ReadClosingField(reader);
         }
 

@@ -121,7 +121,7 @@ namespace PcapngFile
             }
         }
 
-        protected void ReadOptions(BinaryReader reader)
+        private void ReadOptions(BinaryReader reader)
         {
             while (true)
             {
@@ -149,6 +149,15 @@ namespace PcapngFile
                 {
                     this.OnReadOptionsCode(code, value);
                 }
+            }
+        }
+
+        protected void TryReadOptions(BinaryReader reader)
+        {
+            var totalExceptOptionLength = this.GetRemainingLength(reader);
+            if (this.TotalLength != totalExceptOptionLength)
+            {
+                this.ReadOptions(reader);
             }
         }
     }

@@ -52,7 +52,7 @@ namespace PcapngFile
             this.CapturedLength = reader.ReadUInt32();
             this.DataLength = reader.ReadUInt32();
             this.Data = reader.ReadBytes((int)this.CapturedLength);
-            this.ReadOptions(reader);
+            this.TryReadOptions(reader);
             this.ReadClosingField(reader);
         }
 

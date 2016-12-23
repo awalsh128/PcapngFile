@@ -53,7 +53,7 @@ namespace PcapngFile
         {
             this.InterfaceID = reader.ReadInt32();
             this.Timestamp = reader.ReadInt64();
-            this.ReadOptions(reader);
+            this.TryReadOptions(reader);
             this.ReadClosingField(reader);
         }
 
