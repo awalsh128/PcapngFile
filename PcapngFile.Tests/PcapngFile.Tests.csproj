@@ -47,12 +47,6 @@
     <EmbeddedResource Include="TestFile1.pcapng" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\PcapngFile\PcapngFile.csproj">
-      <Project>{e18f5794-d052-46db-830b-a389a2066f95}</Project>
-      <Name>PcapngFile</Name>
-    </ProjectReference>
-  </ItemGroup>
-  <ItemGroup>
     <EmbeddedResource Include="TestFile2.pcapng" />
   </ItemGroup>
   <ItemGroup>
@@ -60,6 +54,12 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\PcapngFile\PcapngFile.csproj">
+      <Project>{f1418868-2158-4e4a-93a1-f9e20bef24ab}</Project>
+      <Name>PcapngFile</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
