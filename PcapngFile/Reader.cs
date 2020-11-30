@@ -49,12 +49,12 @@ namespace PcapngFile
         /// <summary>
         /// Gets the underlying stream length.
         /// </summary>
-	    public long? BaseStreamLength => this.stream.CanSeek ? this.stream.Length : (long?)null;
+	public long? BaseStreamLength => this.stream.CanSeek ? this.stream.Length : (long?)null;
 
-        /// <summary>
-	    /// Gets the underlying stream position.
-	    /// </summary>
-	    public long? BaseStreamPosition => this.stream.CanSeek ? this.stream.Position : (long?)null;
+	/// <summary>
+	/// Gets the underlying stream position.
+	/// </summary>
+	public long? BaseStreamPosition => this.stream.CanSeek ? this.stream.Position : (long?)null;
 
         /// <summary>
         /// Get all enhanced packet blocks.
