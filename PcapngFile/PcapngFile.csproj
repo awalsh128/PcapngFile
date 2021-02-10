@@ -5,7 +5,7 @@
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
 
 	<PackageId>PcapngFile</PackageId>
-	<Description>Reads PCAP Next Generation files and generates CLR objects from its data. Implemented according to the draft specification at http://www.winpcap.org/ntar/draft/PCAP-DumpFileFormat.html.</Description>	
+	<Description>Reads PCAP Next Generation files and generates CLR objects from its data. Implemented according to the draft specification at https://github.com/pcapng/pcapng/blob/master/draft-tuexen-opsawg-pcapng.md.</Description>
 	<Authors>Andrew Walsh (awalsh128.com)</Authors>
 	<Copyright>Copyright 2021</Copyright>
 
