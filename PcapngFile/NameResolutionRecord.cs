@@ -25,75 +25,79 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace PcapngFile
 {
-    using System;
-    using System.Collections.Generic;
-    using System.Collections.ObjectModel;
-    using System.IO;
-    using System.Text;
+  using System;
+  using System.Collections.Generic;
+  using System.Collections.ObjectModel;
+  using System.IO;
+  using System.Text;
 
-    public class NameResolutionRecord
+  public class NameResolutionRecord
+  {
+    private const UInt16 EndRecordType = 0;
+    private const UInt16 Ip4RecordType = 1;
+    private const UInt16 Ip6RecordType = 2;
+
+    private const int Ip4Length = 4;
+    private const int Ip6Length = 8;
+    private const int ValueAlignmentBoundary = 4;
+
+    public bool IsIpVersion6 { get; private set; }
+    public byte[] IpAddress { get; private set; }
+    public ReadOnlyCollection<string> DnsEntries { get; private set; }
+
+    internal NameResolutionRecord(BinaryReader reader)
     {
-        private const UInt16 EndRecordType = 0;
-        private const UInt16 Ip4RecordType = 1;
-        private const UInt16 Ip6RecordType = 2;
+      UInt16 type = reader.ReadUInt16();
+      int valueLength = reader.ReadUInt16();
 
-        private const int Ip4Length = 4;
-        private const int Ip6Length = 8;
-        private const int ValueAlignmentBoundary = 4;
+      if (type != EndRecordType)
+      {
+        int entriesLength = valueLength;
 
-        public bool IsIpVersion6 { get; private set; }
-        public byte[] IpAddress { get; private set; }
-        public ReadOnlyCollection<string> DnsEntries { get; private set; }
-
-        internal NameResolutionRecord(BinaryReader reader)
+        if (type == Ip6RecordType)
         {
-            UInt16 type = reader.ReadUInt16();
-            int valueLength = reader.ReadUInt16();
-
-            if (type != EndRecordType)
-            {
-                int entriesLength = valueLength;
-
-                if (type == Ip6RecordType)
-                {
-                    this.IsIpVersion6 = true;
-                    this.IpAddress = reader.ReadBytes(Ip6Length);
-                    entriesLength -= Ip6Length;
-                }
-                else
-                {
-                    this.IsIpVersion6 = false;
-                    this.IpAddress = reader.ReadBytes(Ip4Length);
-                    entriesLength -= Ip4Length;
-                }
-                this.DnsEntries = this.ReadDnsEntries(reader, entriesLength);
-
-                int remainderLength = valueLength % ValueAlignmentBoundary;
-                if (remainderLength > 0)
-                {
-                    reader.ReadBytes(ValueAlignmentBoundary - remainderLength);     // Read fill bytes to boundary.
-                }
-            }
+          this.IsIpVersion6 = true;
+          this.IpAddress = reader.ReadBytes(Ip6Length);
+          entriesLength -= Ip6Length;
         }
-
-        private ReadOnlyCollection<string> ReadDnsEntries(BinaryReader reader, int entriesLength)
+        else if (type == Ip4RecordType)
         {
-            var entries = new List<string>();
-            byte[] entriesBuffer = reader.ReadBytes(entriesLength);
-            int i = 0, j = 0;
-            while (j < entriesLength)
-            {
-                if (entriesBuffer[j] == 0)
-                {
-                    entries.Add(UTF8Encoding.UTF8.GetString(entriesBuffer, i, j - i));
-                    i = ++j;
-                }
-                else
-                {
-                    j++;
-                }
-            }
-            return new ReadOnlyCollection<string>(entries);
+          this.IsIpVersion6 = false;
+          this.IpAddress = reader.ReadBytes(Ip4Length);
+          entriesLength -= Ip4Length;
         }
+        else
+        {
+          throw new IOException("Name resolution record found unknown type (type = " + type + ")");
+        }
+        this.DnsEntries = ReadDnsEntries(reader, entriesLength);
+
+        int remainderLength = valueLength % ValueAlignmentBoundary;
+        if (remainderLength > 0)
+        {
+          _ = reader.ReadBytes(ValueAlignmentBoundary - remainderLength);     // Read fill bytes to boundary.
+        }
+      }
     }
+
+    private static ReadOnlyCollection<string> ReadDnsEntries(BinaryReader reader, int entriesLength)
+    {
+      var entries = new List<string>();
+      byte[] entriesBuffer = reader.ReadBytes(entriesLength);
+      int i = 0, j = 0;
+      while (j < entriesLength)
+      {
+        if (entriesBuffer[j] == 0)
+        {
+          entries.Add(UTF8Encoding.UTF8.GetString(entriesBuffer, i, j - i));
+          i = ++j;
+        }
+        else
+        {
+          j++;
+        }
+      }
+      return new ReadOnlyCollection<string>(entries);
+    }
+  }
 }

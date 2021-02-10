@@ -25,60 +25,60 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace PcapngFile
 {
-    using System;
-    using System.Collections.Generic;
-    using System.Collections.ObjectModel;
-    using System.IO;
-    using System.Text;
+  using System;
+  using System.Collections.Generic;
+  using System.Collections.ObjectModel;
+  using System.IO;
+  using System.Text;
 
-    public class NameResolutionBlock : BlockBase
+  public class NameResolutionBlock : BlockBase
+  {
+    private const UInt16 NameServerIp4AddressOptionCode = 3;
+    private const UInt16 NameServerIp6AddressOptionCode = 4;
+    private const UInt16 NameServerNameOptionCode = 2;
+
+    public bool IsIpVersion6 => this.NameServerIp4Address == null;
+
+    public byte[] NameServerIp4Address { get; private set; }
+    public byte[] NameServerIp6Address { get; private set; }
+    public string NameServerName { get; private set; }
+    public ReadOnlyCollection<NameResolutionRecord> Records { get; private set; }
+
+    internal NameResolutionBlock(BinaryReader reader)
+        : base(reader)
     {
-        private const UInt16 NameServerIp4AddressOptionCode = 3;
-        private const UInt16 NameServerIp6AddressOptionCode = 4;
-        private const UInt16 NameServerNameOptionCode = 2;
-
-        public bool IsIpVersion6 => this.NameServerIp4Address == null;
-
-        public byte[] NameServerIp4Address { get; private set; }
-        public byte[] NameServerIp6Address { get; private set; }
-        public string NameServerName { get; private set; }
-        public ReadOnlyCollection<NameResolutionRecord> Records { get; private set; }
-
-        internal NameResolutionBlock(BinaryReader reader)
-            : base(reader)
-        {
-            this.Records = this.ReadRecords(reader);
-            this.TryReadOptions(reader);
-            this.ReadClosingField(reader);
-        }
-
-        protected override void OnReadOptionsCode(UInt16 code, byte[] value)
-        {
-            switch (code)
-            {
-                case NameServerIp4AddressOptionCode:
-                    this.NameServerIp4Address = value;
-                    break;
-                case NameServerIp6AddressOptionCode:
-                    this.NameServerIp6Address = value;
-                    break;
-                case NameServerNameOptionCode:
-                    this.NameServerName = Encoding.UTF8.GetString(value);
-                    break;
-            }
-        }
-
-        private ReadOnlyCollection<NameResolutionRecord> ReadRecords(BinaryReader reader)
-        {
-            var records = new List<NameResolutionRecord>();
-            var record = new NameResolutionRecord(reader);
-            while (record.IpAddress != null)
-            {
-                records.Add(record);
-                record = new NameResolutionRecord(reader);
-            }
-
-            return new ReadOnlyCollection<NameResolutionRecord>(records);
-        }
+      this.Records = ReadRecords(reader);
+      this.TryReadOptions(reader);
+      this.ReadClosingField(reader);
     }
+
+    protected override void OnReadOptionsCode(UInt16 code, byte[] value)
+    {
+      switch (code)
+      {
+        case NameServerIp4AddressOptionCode:
+          this.NameServerIp4Address = value;
+          break;
+        case NameServerIp6AddressOptionCode:
+          this.NameServerIp6Address = value;
+          break;
+        case NameServerNameOptionCode:
+          this.NameServerName = Encoding.UTF8.GetString(value);
+          break;
+      }
+    }
+
+    private static ReadOnlyCollection<NameResolutionRecord> ReadRecords(BinaryReader reader)
+    {
+      var records = new List<NameResolutionRecord>();
+      var record = new NameResolutionRecord(reader);
+      while (record.IpAddress != null)
+      {
+        records.Add(record);
+        record = new NameResolutionRecord(reader);
+      }
+
+      return new ReadOnlyCollection<NameResolutionRecord>(records);
+    }
+  }
 }

@@ -25,20 +25,20 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace PcapngFile
 {
-    using System;
-    using System.IO;
+  using System;
+  using System.IO;
 
-    public class SimplePacketBlock : BlockBase
+  public class SimplePacketBlock : BlockBase
+  {
+    public byte[] Data { get; private set; }
+    public UInt32 DataLength { get; private set; }
+
+    internal SimplePacketBlock(BinaryReader reader)
+        : base(reader)
     {
-        public byte[] Data { get; private set; }
-        public UInt32 DataLength { get; private set; }
-
-        internal SimplePacketBlock(BinaryReader reader)
-            : base(reader)
-        {
-            this.DataLength = reader.ReadUInt32();
-            this.Data = reader.ReadBytes((int)this.TotalLength - 16);   // 4 fields x 4 bytes			
-            this.ReadClosingField(reader);
-        }
+      this.DataLength = reader.ReadUInt32();
+      this.Data = reader.ReadBytes((int)this.TotalLength - 16);   // 4 fields x 4 bytes			
+      this.ReadClosingField(reader);
     }
+  }
 }
