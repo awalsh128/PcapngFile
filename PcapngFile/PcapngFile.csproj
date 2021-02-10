@@ -1,22 +1,32 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>netstandard2.0</TargetFramework>
+    <TargetFramework>net5.0</TargetFramework>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <PackageLicenseUrl>https://opensource.org/licenses/BSD-2-Clause</PackageLicenseUrl>
-    <PackageProjectUrl>https://github.com/awalsh128/PcapngFile</PackageProjectUrl>
-    <Copyright>Copyright 2016</Copyright>
-    <PackageTags>pcap, pcap-ng, packet capture, packet</PackageTags>
-    <AssemblyVersion>1.0.5.0</AssemblyVersion>
-    <FileVersion>1.0.5.0</FileVersion>
-    <Description>Reads PCAP Next Generation files and generates CLR objects from its data. Implemented according to the draft specification at http://www.winpcap.org/ntar/draft/PCAP-DumpFileFormat.html.</Description>
-    <Authors>Andrew Walsh</Authors>
-    <Product>PcapngFile</Product>
-    <NeutralLanguage></NeutralLanguage>
-    <RepositoryUrl>https://github.com/awalsh128/PcapngFile</RepositoryUrl>
-    <RepositoryType>git</RepositoryType>
-    <PackageReleaseNotes>Port to .NET Standard</PackageReleaseNotes>
-    <Version>1.0.5</Version>
+
+	<PackageId>PcapngFile</PackageId>
+	<Description>Reads PCAP Next Generation files and generates CLR objects from its data. Implemented according to the draft specification at http://www.winpcap.org/ntar/draft/PCAP-DumpFileFormat.html.</Description>	
+	<Authors>Andrew Walsh (awalsh128.com)</Authors>
+	<Copyright>Copyright 2021</Copyright>
+
+	<NeutralLanguage></NeutralLanguage>
+	<RepositoryType>git</RepositoryType>
+	<RepositoryUrl>https://github.com/awalsh128/PcapngFile</RepositoryUrl>
+
+	<PackageProjectUrl>https://github.com/awalsh128/PcapngFile</PackageProjectUrl>		
+	<PackageTags>pcap, pcap-ng, packet capture, packet</PackageTags>
+	<PackageLicenseExpression>BSD-2-Clause</PackageLicenseExpression>
+
+	<Version>1.0.5</Version>
+	<PackageReleaseNotes>
+		* Port to .NET 5.0.
+		* Update package metadata including copyright.
+	</PackageReleaseNotes>
+    
   </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NETCore.Platforms" Version="5.0.0" />
+  </ItemGroup>
 
 </Project>

@@ -1,6 +1,7 @@
 ﻿namespace PcapngFile.Tests
 {
     using NUnit.Framework;
+    using PcapngFile;
     using System.IO;
     using System.Linq;
     using System.Reflection;

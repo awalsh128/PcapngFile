@@ -1,5 +1,5 @@
 ﻿/*
-Copyright (c) 2016, Andrew Walsh
+Copyright (c) 2021, Andrew Walsh
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
