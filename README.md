@@ -2,6 +2,11 @@
 
 Reads PCAP Next Generation files and generates CLR objects from its data. Implemented according to the draft specification at http://www.winpcap.org/ntar/draft/PCAP-DumpFileFormat.html.
 
+![.NET](https://github.com/awalsh128/PcapngFile/workflows/.NET/badge.svg)&nbsp;&nbsp;
+<a href="https://www.nuget.org/packages/PcapngFile/">
+   <img src="https://img.shields.io/nuget/v/PcapngFile.svg" alt="NuGet version (PcapngFile)"/>
+</a>
+
 ## Usage
 
 ```csharp
