@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="PcapngFile.Tests/PcapngFile.Tests.csproj" />
+  <Project Path="PcapngFile/PcapngFile.csproj" />
+</Solution>
