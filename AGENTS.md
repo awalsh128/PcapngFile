@@ -45,12 +45,18 @@ Packing: `GeneratePackageOnBuild` is on, so build first and then run `dotnet pac
 
 - **`Reader`** reads one whole block at a time, in order, into a byte array, and never seeks. That's what lets it read unseekable streams. Peeking (`PeekStoreType`, `PeekClrType`) keeps the next block in a `pending` field. `Reset()` and the automatic reset after an enumeration need a seekable stream.
 - **Byte order is per section.** Each Section Header Block's byte-order magic (`0x1A2B3C4D`) sets the byte order of the blocks after it. A file can mix little- and big-endian sections.
+- **Per-section state:** `Reader.TrackSection` also skips whole sections whose major version isn't 1, and remembers the snap length of the section's first interface, which `SimplePacketBlock` needs to drop padding. It runs on every raw block, including ones an iterator filters out.
 - **`EndianBinaryReader`** is an internal `BinaryReader` subclass over one block's bytes that reverses byte order for big-endian sections. Block constructors take a `BinaryReader` and read fields with it as usual.
-- **Option values** are raw `byte[]`. Never decode them with `BitConverter`. Use the `BlockBase` helpers `ToInt32`, `ToUInt32`, `ToInt64` and `ToTimestamp`, which follow the section's byte order.
-- **Options:** `BlockBase.TryReadOptions` reads until `opt_endofopt` or the end of the block, since the end marker is optional. It handles `opt_comment` itself and passes every other option to the block's `OnReadOptionsCode` override, which must ignore codes it doesn't know.
+- **Option values** are raw `byte[]`. Never decode them with `BitConverter` or `Encoding.UTF8` directly. Use the `BlockBase` helpers:
+  - `ToByte`, `ToInt32`, `ToUInt32`, `ToInt64`, `ToUInt64` and `ToTimestamp`, which follow the section's byte order and check the length
+  - `ToUtf8String`, which stops at a zero byte
+  - `ToPacketHash`, and `RequireLength`/`RequireMinimumLength` for byte arrays
+- **Invalid lengths:** the helpers throw a private exception when an option has the wrong length. `ReadOptions` catches it, ignores the option and records its code in `InvalidOptionCodes`, as the spec allows. New option handlers must validate lengths the same way.
+- **Options:** `BlockBase.TryReadOptions` reads until `opt_endofopt` or the end of the block, since the end marker is optional. It handles `opt_comment` and custom options (2988/2989/19372/19373) itself and passes every other option to the block's `OnReadOptionsCode` override, which must ignore codes it doesn't know.
+- **Repeatable options** (comments, `if_IPv4addr`, `if_IPv6addr`, `epb_hash`, `epb_verdict`, `epb_processid_threadid`, `pack_hash`) are kept in lists exposed as `IReadOnlyList<T>`. The older singular property (e.g. `Comment`, `Hash`) returns the first one.
 - **Block layout:** `ReadClosingField` reads the trailing length at the end of the block, not the current position, because blocks can have unused space after their options.
 - **Unsupported types are skipped:** block types (Custom, Decryption Secrets, private types) and name resolution record types the library doesn't support are skipped, as the spec requires, not thrown on.
-- **Timestamps** are unsigned 64-bit values stored as high 32 bits then low 32 bits. `TimestampTransformer` converts them using `if_tsresol` (base 10 or base 2; default 6 = microseconds) and `if_tsoffset`, with 128-bit math. It returns UTC and throws `ArgumentOutOfRangeException` outside the `DateTime` range.
+- **Timestamps** are unsigned 64-bit values stored as high 32 bits then low 32 bits. `TimestampTransformer` converts them using `if_tsresol` (base 10 or base 2; default 6 = microseconds) and `if_tsoffset`, with 128-bit math. It returns UTC and throws `ArgumentOutOfRangeException` outside the `DateTime` range. Blocks expose raw `long` timestamps plus `GetTimestamp(InterfaceDescriptionBlock, out bool)` helpers, which use `BlockBase.ToDateTime`.
 - **Construction:** block constructors are `internal`, so no one outside the assembly can subclass `BlockBase`. New internal-only helpers there should be `private protected`, so they don't need public XML docs.
 - **Tests:** `AllowUnitTesting.cs` gives `PcapngFile.Tests` access to internals.
 
@@ -68,19 +74,10 @@ Packing: `GeneratePackageOnBuild` is on, so build first and then run `dotnet pac
 
 For a broader check, run the library over [hadrielk/pcapng-test-generator](https://github.com/hadrielk/pcapng-test-generator). It has 24 little-endian and 24 big-endian test files, each with a `.txt` file listing its expected blocks. All 48 currently read correctly; the only differences are the Custom Blocks, which are skipped on purpose.
 
-Known gaps against the spec:
-- Sections with an unsupported version (major version ≠ 1) aren't skipped. Minor version 2 should be treated as 0.
-- A zero byte doesn't end option strings, so a trailing `\0` is kept.
-- Hash algorithm 5 (Toeplitz) is missing from `HashAlgorithm`, and `GetHashAlgorithm` throws on it.
-- `SimplePacketBlock.Data` includes padding bytes. Its correct length needs the interface's snap length.
-- Options that can repeat (comments, `if_IPv4addr`/`if_IPv6addr`, `epb_hash`) keep only the last value.
-- Options not exposed:
-  - interface: `if_hardware`, `if_txspeed`, `if_rxspeed`, `if_iana_tzname`
-  - enhanced packet: `epb_packetid`, `epb_queue`, `epb_verdict`, `epb_processid_threadid`
-  - packet flag bits 9–11
-  - EUI-48/EUI-64 name resolution records (currently skipped)
-- `PacketBlock.Timestamp` (obsolete block) is decoded with `DateTime.FromBinary`, which is wrong. Fixing it means changing the property's type.
-- `InterfaceStatisticsBlock` has no `GetTimestamp` helper; its timestamps are raw values.
+Every block and option defined for the standard blocks is read. What's left is optional:
+- Custom Blocks and Decryption Secrets Blocks are skipped rather than exposed as block classes.
+- `if_filter` is kept as raw bytes, because the spec doesn't define the filter formats yet.
+- Invalid UTF-8 in strings is replaced with U+FFFD. The spec allows this.
 
 Open GitHub issues: https://github.com/awalsh128/PcapngFile/issues
 

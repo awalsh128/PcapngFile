@@ -27,7 +27,6 @@ namespace PcapngFile
 {
     using System;
     using System.IO;
-    using System.Text;
 
     /// <summary>
     /// Starts a section of the file. Every other block belongs to the section before it.
@@ -90,13 +89,13 @@ namespace PcapngFile
             switch (code)
             {
                 case HardwareOptionCode:
-                    this.Hardware = Encoding.UTF8.GetString(value);
+                    this.Hardware = ToUtf8String(value);
                     break;
                 case OperatingSystemOptionCode:
-                    this.OperatingSystem = Encoding.UTF8.GetString(value);
+                    this.OperatingSystem = ToUtf8String(value);
                     break;
                 case UserApplicationOptionCode:
-                    this.UserApplication = Encoding.UTF8.GetString(value);
+                    this.UserApplication = ToUtf8String(value);
                     break;
             }
         }

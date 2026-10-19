@@ -26,6 +26,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 namespace PcapngFile
 {
     using System;
+    using System.Collections.Generic;
+    using System.Collections.ObjectModel;
     using System.IO;
 
     /// <summary>
@@ -39,6 +41,11 @@ namespace PcapngFile
         private const UInt16 FlagsOptionCode = 2;
         private const UInt32 FlagsOptionHeader = (FlagsOptionCode << 16) | 4;
         private const UInt16 HashOptionCode = 3;
+        private const UInt16 PacketIdOptionCode = 5;
+        private const UInt16 QueueOptionCode = 6;
+        private const UInt16 VerdictOptionCode = 7;
+        private const UInt16 ProcessThreadIdOptionCode = 8;
+        private const int VerdictValueLength = 8;
         //private const UInt32 HashOptionHeader = (HashOptionCode << 16) | <variable depending on code>
         private const int HeaderAndFooterLength = (7 * 4) + BlockTotalLengthLength; // 7 4-byte header fields + 1 4-byte footer field
 
@@ -62,15 +69,44 @@ namespace PcapngFile
         /// </summary>
         public long DropCount { get; private set; }
 
+        private readonly List<PacketHash> hashes = new List<PacketHash>();
+        private readonly List<PacketVerdict> verdicts = new List<PacketVerdict>();
+        private readonly List<ProcessThreadId> processThreadIds = new List<ProcessThreadId>();
+
         /// <summary>
-        /// Gets the packet hash (epb_hash), or <c>null</c> if there is none.
+        /// Gets the first packet hash (epb_hash), or <c>null</c> if there is none. See <see cref="Hashes"/> for all of them.
         /// </summary>
-        public byte[] Hash { get; private set; }
+        public byte[] Hash => this.hashes.Count > 0 ? this.hashes[0].Value : null;
 
         /// <summary>
         /// Gets the algorithm used to compute <see cref="Hash"/>.
         /// </summary>
-        public HashAlgorithm HashAlgorithm { get; private set; }
+        public HashAlgorithm HashAlgorithm => this.hashes.Count > 0 ? this.hashes[0].Algorithm : default;
+
+        /// <summary>
+        /// Gets all packet hashes (epb_hash), in file order.
+        /// </summary>
+        public IReadOnlyList<PacketHash> Hashes { get; }
+
+        /// <summary>
+        /// Gets the identifier that correlates copies of the same packet across interfaces (epb_packetid), or <c>null</c> if there is none.
+        /// </summary>
+        public UInt64? PacketId { get; private set; }
+
+        /// <summary>
+        /// Gets the interface queue the packet was received on (epb_queue), or <c>null</c> if there is none.
+        /// </summary>
+        public UInt32? Queue { get; private set; }
+
+        /// <summary>
+        /// Gets the verdicts on what would be done with the packet (epb_verdict), in file order.
+        /// </summary>
+        public IReadOnlyList<PacketVerdict> Verdicts { get; }
+
+        /// <summary>
+        /// Gets the processes and threads that could have sent or received the packet (epb_processid_threadid), in file order.
+        /// </summary>
+        public IReadOnlyList<ProcessThreadId> ProcessThreadIds { get; }
 
         /// <summary>
         /// Gets the zero-based index of the <see cref="InterfaceDescriptionBlock"/> in this section that the packet was captured on.
@@ -90,6 +126,9 @@ namespace PcapngFile
         internal EnhancedPacketBlock(BinaryReader reader)
             : base(reader)
         {
+            this.Hashes = new ReadOnlyCollection<PacketHash>(this.hashes);
+            this.Verdicts = new ReadOnlyCollection<PacketVerdict>(this.verdicts);
+            this.ProcessThreadIds = new ReadOnlyCollection<ProcessThreadId>(this.processThreadIds);
             this.InterfaceID = reader.ReadInt32();
             this.Timestamp = ReadTimestamp(reader);
             this.CapturedLength = reader.ReadInt32();
@@ -131,8 +170,7 @@ namespace PcapngFile
         /// <exception cref="ArgumentOutOfRangeException">The timestamp is outside the range of <see cref="DateTime"/>.</exception>
         public DateTime GetTimestamp(InterfaceDescriptionBlock block, out bool precisionLoss)
         {
-            ArgumentNullException.ThrowIfNull(block);
-            return block.GetTimestampTransformer().ToDateTime(this.Timestamp, out precisionLoss);
+            return ToDateTime(block, this.Timestamp, out precisionLoss);
         }
 
         /// <inheritdoc/>
@@ -147,10 +185,37 @@ namespace PcapngFile
                     this.Flags = new PacketOptionFlags(this.ToUInt32(value));
                     break;
                 case HashOptionCode:
-                    this.HashAlgorithm = GetHashAlgorithm(value[0]);
-                    this.Hash = value[1..];
+                    this.hashes.Add(ToPacketHash(value));
+                    break;
+                case PacketIdOptionCode:
+                    this.PacketId = this.ToUInt64(value);
+                    break;
+                case QueueOptionCode:
+                    this.Queue = this.ToUInt32(value);
+                    break;
+                case VerdictOptionCode:
+                    this.verdicts.Add(this.ToPacketVerdict(value));
+                    break;
+                case ProcessThreadIdOptionCode:
+                    RequireLength(value, 8);
+                    this.processThreadIds.Add(new ProcessThreadId(this.ToUInt32(value[..4]), this.ToUInt32(value[4..])));
                     break;
             }
+        }
+
+        // The first byte is the verdict type; the Linux eBPF types carry a 64-bit integer after it.
+        private PacketVerdict ToPacketVerdict(byte[] value)
+        {
+            RequireMinimumLength(value, 1);
+            var type = (PacketVerdictType)value[0];
+            byte[] data = value[1..];
+            UInt64? verdictValue = null;
+            if (type == PacketVerdictType.LinuxEbpfTrafficControl || type == PacketVerdictType.LinuxEbpfXdp)
+            {
+                RequireLength(data, VerdictValueLength);
+                verdictValue = this.ToUInt64(data);
+            }
+            return new PacketVerdict(type, data, verdictValue);
         }
     }
 }

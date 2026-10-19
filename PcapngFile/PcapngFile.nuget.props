@@ -31,6 +31,13 @@
       * Fix Reader(string) failing on read-only files.
       * Support base-2 timestamp resolutions and apply if_tsoffset in EnhancedPacketBlock.GetTimestamp, which now returns UTC and reports precision loss per timestamp.
       * Fix interfaces without if_tsresol defaulting to a resolution of seconds instead of microseconds.
+      * Skip sections whose major version isn't 1.
+      * End option strings at a zero byte, and skip options with an invalid length, listing them in InvalidOptionCodes.
+      * Keep every value of repeatable options (Comments, IPv4Addresses, IPv6Addresses, Hashes); the singular properties return the first.
+      * Add custom options, the Toeplitz hash algorithm, if_hardware, if_txspeed, if_rxspeed, if_iana_tzname, epb_packetid, epb_queue, epb_verdict, epb_processid_threadid, packet flag bits 9-11, and EUI-48/EUI-64 name resolution records.
+      * Fix SimplePacketBlock.Data including padding; its length now honors the first interface's snap length.
+      * Breaking: PacketBlock.Timestamp is now the raw timestamp, with GetTimestamp to convert it, as in EnhancedPacketBlock.
+      * Add GetTimestamp, GetStartTime and GetEndTime to InterfaceStatisticsBlock.
     </PackageReleaseNotes>
 
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>

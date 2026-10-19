@@ -53,6 +53,11 @@ namespace PcapngFile
         /// <summary>
         /// XOR checksum.
         /// </summary>
-        Xor = 1
+        Xor = 1,
+
+        /// <summary>
+        /// Toeplitz hash, as used for receive side scaling.
+        /// </summary>
+        Toeplitz = 5,
     }
 }

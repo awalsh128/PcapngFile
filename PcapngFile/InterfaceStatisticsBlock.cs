@@ -41,8 +41,11 @@ namespace PcapngFile
         private const UInt16 StartTimeOptionCode = 2;
         private const UInt16 TotalPacketsSentOptionCode = 8;
 
+        private bool hasEndTime;
+        private bool hasStartTime;
+
         /// <summary>
-        /// Gets the time the capture ended (isb_endtime).
+        /// Gets the raw time the capture ended (isb_endtime), or 0 if there is none. Use <see cref="GetEndTime"/> to convert it.
         /// </summary>
         public long EndTime { get; private set; }
 
@@ -72,12 +75,12 @@ namespace PcapngFile
         public long PacketsReceived { get; private set; }
 
         /// <summary>
-        /// Gets the time the capture started (isb_starttime).
+        /// Gets the raw time the capture started (isb_starttime), or 0 if there is none. Use <see cref="GetStartTime"/> to convert it.
         /// </summary>
         public long StartTime { get; private set; }
 
         /// <summary>
-        /// Gets the raw timestamp of when the statistics were taken.
+        /// Gets the raw timestamp of when the statistics were taken. Use <see cref="GetTimestamp"/> to convert it.
         /// </summary>
         public long Timestamp { get; private set; }
 
@@ -102,6 +105,7 @@ namespace PcapngFile
             {
                 case EndTimeOptionCode:
                     this.EndTime = this.ToTimestamp(value);
+                    this.hasEndTime = true;
                     break;
                 case PacketsDroppedOptionCode:
                     this.PacketsDropped = this.ToInt64(value);
@@ -117,11 +121,54 @@ namespace PcapngFile
                     break;
                 case StartTimeOptionCode:
                     this.StartTime = this.ToTimestamp(value);
+                    this.hasStartTime = true;
                     break;
                 case TotalPacketsSentOptionCode:
                     this.TotalPacketsSent = this.ToInt64(value);
                     break;
             }
+        }
+
+        /// <summary>
+        /// Gets the UTC <see cref="DateTime"/> of when the statistics were taken, applying the interface's timestamp
+        /// resolution (if_tsresol) and offset (if_tsoffset).
+        /// </summary>
+        /// <param name="block">The <see cref="InterfaceDescriptionBlock"/> the statistics refer to.</param>
+        /// <param name="precisionLoss">True if the timestamp was finer than a <see cref="DateTime"/> tick (100 ns) and was truncated.</param>
+        /// <returns>The UTC <see cref="DateTime"/> equivalent of the <see cref="Timestamp"/>.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="block"/> is <c>null</c>.</exception>
+        /// <exception cref="ArgumentOutOfRangeException">The timestamp is outside the range of <see cref="DateTime"/>.</exception>
+        public DateTime GetTimestamp(InterfaceDescriptionBlock block, out bool precisionLoss)
+        {
+            return ToDateTime(block, this.Timestamp, out precisionLoss);
+        }
+
+        /// <summary>
+        /// Gets the UTC <see cref="DateTime"/> the capture started (isb_starttime), applying the interface's timestamp
+        /// resolution and offset.
+        /// </summary>
+        /// <param name="block">The <see cref="InterfaceDescriptionBlock"/> the statistics refer to.</param>
+        /// <returns>The start time, or <c>null</c> if the block doesn't have one.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="block"/> is <c>null</c>.</exception>
+        /// <exception cref="ArgumentOutOfRangeException">The timestamp is outside the range of <see cref="DateTime"/>.</exception>
+        public DateTime? GetStartTime(InterfaceDescriptionBlock block)
+        {
+            ArgumentNullException.ThrowIfNull(block);
+            return this.hasStartTime ? ToDateTime(block, this.StartTime, out _) : null;
+        }
+
+        /// <summary>
+        /// Gets the UTC <see cref="DateTime"/> the capture ended (isb_endtime), applying the interface's timestamp
+        /// resolution and offset.
+        /// </summary>
+        /// <param name="block">The <see cref="InterfaceDescriptionBlock"/> the statistics refer to.</param>
+        /// <returns>The end time, or <c>null</c> if the block doesn't have one.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="block"/> is <c>null</c>.</exception>
+        /// <exception cref="ArgumentOutOfRangeException">The timestamp is outside the range of <see cref="DateTime"/>.</exception>
+        public DateTime? GetEndTime(InterfaceDescriptionBlock block)
+        {
+            ArgumentNullException.ThrowIfNull(block);
+            return this.hasEndTime ? ToDateTime(block, this.EndTime, out _) : null;
         }
     }
 }

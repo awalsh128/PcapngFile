@@ -43,6 +43,9 @@ namespace PcapngFile
         private const uint PromiscuousReceptionType = 4;
         private const uint FcsLengthMask = 0x000001E0;
         private const int FcsLengthOffset = 5;
+        private const uint ChecksumNotReadyMask = 0x00000200;
+        private const uint ChecksumValidMask = 0x00000400;
+        private const uint TcpSegmentationOffloadedMask = 0x00000800;
         private const uint LinkLayerSymbolErrorMask = 0x80000000;
         private const uint LinkLayerPreambleErrorMask = 0x40000000;
         private const uint LinkLayerStartFrameDelimiterErrorMask = 0x20000000;
@@ -144,6 +147,33 @@ namespace PcapngFile
         {
             return (this.optionValue & FcsLengthMask) >> FcsLengthOffset;
         }
+        /// <summary>
+        /// Gets whether the packet's checksum wasn't computed yet because of checksum offloading.
+        /// </summary>
+        /// <returns><c>true</c> if the flag is set.</returns>
+        public bool IsChecksumNotReady()
+        {
+            return (this.optionValue & ChecksumNotReadyMask) > 0;
+        }
+
+        /// <summary>
+        /// Gets whether the packet's checksum was already checked before capture, so it doesn't need checking again.
+        /// </summary>
+        /// <returns><c>true</c> if the flag is set.</returns>
+        public bool IsChecksumValid()
+        {
+            return (this.optionValue & ChecksumValidMask) > 0;
+        }
+
+        /// <summary>
+        /// Gets whether TCP segmentation was offloaded, so the packet covers several link layer packets.
+        /// </summary>
+        /// <returns><c>true</c> if the flag is set.</returns>
+        public bool IsTcpSegmentationOffloaded()
+        {
+            return (this.optionValue & TcpSegmentationOffloadedMask) > 0;
+        }
+
         internal byte[] GetOptionValue()
         {
             return BitConverter.GetBytes(this.optionValue);

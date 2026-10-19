@@ -39,7 +39,8 @@ namespace PcapngFile
     /// </para>
     /// <para>
     /// Blocks are read sequentially, so the stream does not need to support seeking unless <see cref="Reset"/> is used.
-    /// Sections of either byte order are supported, and blocks of types this library does not support are skipped.
+    /// Sections of either byte order are supported. Blocks of types this library does not support are skipped, as are
+    /// whole sections whose major version is not 1.
     /// </para>
     /// </remarks>
     public class Reader : IDisposable
@@ -48,13 +49,23 @@ namespace PcapngFile
         private const int ByteOrderMagicLength = 4;
         private const uint ByteOrderMagic = 0x1A2B3C4D;
         private const uint SwappedByteOrderMagic = 0x4D3C2B1A;
-        private const int MinimumBlockLength = BlockHeaderLength + BlockBase.BlockTotalLengthLength;
+        private const uint MinimumBlockLength = BlockHeaderLength + BlockBase.BlockTotalLengthLength;
+        private const uint MinimumSectionHeaderLength = 28;
+        private const int SectionHeaderMajorVersionOffset = 12;
+        private const ushort SupportedMajorVersion = 1;
+        private const int InterfaceSnapLengthOffset = 12;
 
         private readonly bool leaveOpen;
         private readonly Stream stream;
 
         // The byte order of the current section, set by its Section Header Block.
         private bool isBigEndian;
+
+        // Whether the current section has a major version this library can't read, so its blocks are skipped.
+        private bool isUnsupportedSection;
+
+        // The snap length of the current section's first interface, used by Simple Packet Blocks.
+        private uint? firstInterfaceSnapLength;
 
         // The next supported block, read ahead by a peek but not yet returned.
         private RawBlock pending;
@@ -297,6 +308,8 @@ namespace PcapngFile
             _ = this.stream.Seek(0, SeekOrigin.Begin);
             this.pending = null;
             this.isBigEndian = false;
+            this.isUnsupportedSection = false;
+            this.firstInterfaceSnapLength = null;
         }
 
         private void ResetIfSeekable()
@@ -318,7 +331,7 @@ namespace PcapngFile
                 BlockType.NameResolution => new NameResolutionBlock(reader),
                 BlockType.Packet => new PacketBlock(reader),
                 BlockType.SectionHeader => new SectionHeaderBlock(reader),
-                BlockType.SimplePacket => new SimplePacketBlock(reader),
+                BlockType.SimplePacket => new SimplePacketBlock(reader, raw.SnapLength),
                 _ => throw new InvalidOperationException("Unsupported block type (type = " + raw.Type + ")."),
             };
         }
@@ -348,7 +361,7 @@ namespace PcapngFile
                 {
                     return null;
                 }
-                if (IsSupported(raw.Type))
+                if (IsSupported(raw.Type) && !this.isUnsupportedSection)
                 {
                     this.pending = raw;
                 }
@@ -385,7 +398,8 @@ namespace PcapngFile
 
             var type = (BlockType)this.ReadUInt32(header, 0);
             uint totalLength = this.ReadUInt32(header, BlockBase.BlockTypeLength);
-            if (totalLength < MinimumBlockLength || totalLength % 4 != 0 || totalLength > int.MaxValue)
+            uint minimumLength = type == BlockType.SectionHeader ? MinimumSectionHeaderLength : MinimumBlockLength;
+            if (totalLength < minimumLength || totalLength % 4 != 0 || totalLength > int.MaxValue)
             {
                 throw new IOException("Block total length is invalid (type = " + type + ", length = " + totalLength + ").");
             }
@@ -393,7 +407,29 @@ namespace PcapngFile
             var data = new byte[totalLength];
             header.AsSpan(0, headerLength).CopyTo(data);
             this.stream.ReadExactly(data, headerLength, data.Length - headerLength);
-            return new RawBlock(type, data, this.isBigEndian);
+            this.TrackSection(type, data);
+            return new RawBlock(type, data, this.isBigEndian, this.firstInterfaceSnapLength ?? 0);
+        }
+
+        // Updates the per-section state that later blocks depend on.
+        private void TrackSection(BlockType type, byte[] data)
+        {
+            if (type == BlockType.SectionHeader)
+            {
+                // Readers must skip sections whose version they can't read. Minor versions only add blocks and options.
+                this.isUnsupportedSection = this.ReadUInt16(data, SectionHeaderMajorVersionOffset) != SupportedMajorVersion;
+                this.firstInterfaceSnapLength = null;
+            }
+            else if (type == BlockType.InterfaceDescription && this.firstInterfaceSnapLength == null && data.Length >= InterfaceSnapLengthOffset + 4)
+            {
+                this.firstInterfaceSnapLength = this.ReadUInt32(data, InterfaceSnapLengthOffset);
+            }
+        }
+
+        private ushort ReadUInt16(byte[] buffer, int offset)
+        {
+            var span = buffer.AsSpan(offset);
+            return this.isBigEndian ? BinaryPrimitives.ReadUInt16BigEndian(span) : BinaryPrimitives.ReadUInt16LittleEndian(span);
         }
 
         private uint ReadUInt32(byte[] buffer, int offset)
@@ -402,6 +438,7 @@ namespace PcapngFile
             return this.isBigEndian ? BinaryPrimitives.ReadUInt32BigEndian(span) : BinaryPrimitives.ReadUInt32LittleEndian(span);
         }
 
-        private sealed record RawBlock(BlockType Type, byte[] Data, bool IsBigEndian);
+        // A whole block read from the stream. SnapLength is the section's first interface snap length, for Simple Packet Blocks.
+        private sealed record RawBlock(BlockType Type, byte[] Data, bool IsBigEndian, uint SnapLength);
     }
 }

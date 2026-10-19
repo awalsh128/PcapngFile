@@ -81,6 +81,14 @@ foreach (var packet in reader.EnhancedPacketBlocks)
 
 Files written on big-endian and little-endian machines are both supported, as are files that mix the two across sections. Blocks and name resolution records of types the library doesn't support are skipped.
 
+`InterfaceStatisticsBlock` and the obsolete `PacketBlock` have the same raw timestamps and `GetTimestamp` helpers. `InterfaceStatisticsBlock` also has `GetStartTime` and `GetEndTime`, which return `null` when the option is absent.
+
+### Options
+
+Each option has a property on its block, named after the spec field in its documentation (e.g. `InterfaceDescriptionBlock.TimestampResolution` is `if_tsresol`). Options that can repeat, such as comments, interface addresses and packet hashes, are lists (`Comments`, `IPv4Addresses`, `Hashes`); the singular property (`Comment`, `IPv4Address`, `Hash`) returns the first one. Vendor-specific options are in `CustomOptions`. Options with an invalid length are skipped and their codes listed in `InvalidOptionCodes`.
+
+Sections with a major version other than 1 are skipped, as the spec requires.
+
 ## Block types
 
 | Class | Contents |

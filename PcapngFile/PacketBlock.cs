@@ -26,6 +26,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 namespace PcapngFile
 {
     using System;
+    using System.Collections.Generic;
+    using System.Collections.ObjectModel;
     using System.IO;
 
     /// <summary>
@@ -36,6 +38,8 @@ namespace PcapngFile
         private const int DataAlignmentBoundary = 4;
         private const UInt16 FlagsOptionCode = 2;
         private const UInt16 HashOptionCode = 3;
+
+        private readonly List<PacketHash> hashes = new List<PacketHash>();
 
         /// <summary>
         /// Gets the number of packet bytes captured, which can be less than <see cref="DataLength"/> if the packet was truncated.
@@ -63,14 +67,19 @@ namespace PcapngFile
         public PacketOptionFlags Flags { get; private set; }
 
         /// <summary>
-        /// Gets the packet hash (pack_hash), or <c>null</c> if there is none.
+        /// Gets the first packet hash (pack_hash), or <c>null</c> if there is none. See <see cref="Hashes"/> for all of them.
         /// </summary>
-        public byte[] Hash { get; private set; }
+        public byte[] Hash => this.hashes.Count > 0 ? this.hashes[0].Value : null;
+
+        /// <summary>
+        /// Gets all packet hashes (pack_hash), in file order.
+        /// </summary>
+        public IReadOnlyList<PacketHash> Hashes { get; }
 
         /// <summary>
         /// Gets the algorithm used to compute <see cref="Hash"/>.
         /// </summary>
-        public HashAlgorithm HashAlgorithm { get; private set; }
+        public HashAlgorithm HashAlgorithm => this.hashes.Count > 0 ? this.hashes[0].Algorithm : default;
 
         /// <summary>
         /// Gets the zero-based index of the <see cref="InterfaceDescriptionBlock"/> in this section that the packet was captured on.
@@ -78,16 +87,17 @@ namespace PcapngFile
         public UInt16 InterfaceID { get; private set; }
 
         /// <summary>
-        /// Gets the time the packet was captured.
+        /// Gets the raw timestamp in units of the interface's timestamp resolution. Use <see cref="GetTimestamp"/> to convert it.
         /// </summary>
-        public DateTime Timestamp { get; private set; }
+        public long Timestamp { get; private set; }
 
         internal PacketBlock(BinaryReader reader)
             : base(reader)
         {
+            this.Hashes = new ReadOnlyCollection<PacketHash>(this.hashes);
             this.InterfaceID = reader.ReadUInt16();
             this.DropsCount = reader.ReadUInt16();
-            this.Timestamp = DateTime.FromBinary(reader.ReadInt64());
+            this.Timestamp = ReadTimestamp(reader);
             this.CapturedLength = reader.ReadUInt32();
             this.DataLength = reader.ReadUInt32();
             this.Data = reader.ReadBytes((int)this.CapturedLength);
@@ -111,10 +121,23 @@ namespace PcapngFile
                     this.Flags = new PacketOptionFlags(this.ToUInt32(value));
                     break;
                 case HashOptionCode:
-                    this.HashAlgorithm = GetHashAlgorithm(value[0]);
-                    this.Hash = value[1..];
+                    this.hashes.Add(ToPacketHash(value));
                     break;
             }
+        }
+
+        /// <summary>
+        /// Gets the UTC <see cref="DateTime"/> equivalent of the <see cref="Timestamp"/>, applying the interface's
+        /// timestamp resolution (if_tsresol) and offset (if_tsoffset).
+        /// </summary>
+        /// <param name="block">The <see cref="InterfaceDescriptionBlock"/> the packet was captured on.</param>
+        /// <param name="precisionLoss">True if the timestamp was finer than a <see cref="DateTime"/> tick (100 ns) and was truncated.</param>
+        /// <returns>The UTC <see cref="DateTime"/> equivalent of the <see cref="Timestamp"/>.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="block"/> is <c>null</c>.</exception>
+        /// <exception cref="ArgumentOutOfRangeException">The timestamp is outside the range of <see cref="DateTime"/>.</exception>
+        public DateTime GetTimestamp(InterfaceDescriptionBlock block, out bool precisionLoss)
+        {
+            return ToDateTime(block, this.Timestamp, out precisionLoss);
         }
     }
 }

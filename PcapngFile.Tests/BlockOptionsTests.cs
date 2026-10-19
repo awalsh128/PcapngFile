@@ -37,6 +37,8 @@ namespace PcapngFile.Tests
 
             public override void Write(long value) => base.Write(this.isBigEndian ? BinaryPrimitives.ReverseEndianness(value) : value);
 
+            public override void Write(ulong value) => base.Write(this.isBigEndian ? BinaryPrimitives.ReverseEndianness(value) : value);
+
             public SectionWriter CreateBodyWriter(Stream stream) => new SectionWriter(stream, this.isBigEndian);
 
             public byte[] Bytes(Action<SectionWriter> write)
@@ -159,6 +161,48 @@ namespace PcapngFile.Tests
         {
             var value = address.Concat(Encoding.UTF8.GetBytes(name)).Append((byte)0).ToArray();
             WriteOption(writer, type, value);
+        }
+
+        private static void WriteSectionHeader(SectionWriter writer, ushort majorVersion = 1, ushort minorVersion = 0, string userApplication = null)
+        {
+            WriteBlock(writer, (uint)BlockType.SectionHeader, body =>
+            {
+                body.Write(0x1A2B3C4Du);
+                body.Write(majorVersion);
+                body.Write(minorVersion);
+                body.Write(-1L);
+                if (userApplication != null)
+                {
+                    WriteOption(body, 4, Encoding.UTF8.GetBytes(userApplication)); // shb_userappl
+                    WriteEndOfOptions(body);
+                }
+            });
+        }
+
+        private static void WriteInterface(SectionWriter writer, int snapLength, Action<SectionWriter> writeOptions = null)
+        {
+            WriteBlock(writer, (uint)BlockType.InterfaceDescription, body =>
+            {
+                body.Write((ushort)LinkType.Ethernet);
+                body.Write((ushort)0);
+                body.Write(snapLength);
+                if (writeOptions != null)
+                {
+                    writeOptions(body);
+                    WriteEndOfOptions(body);
+                }
+            });
+        }
+
+        private static Reader CreateReader(bool isBigEndian, Action<SectionWriter> write)
+        {
+            var stream = new MemoryStream();
+            using (var writer = new SectionWriter(stream, isBigEndian))
+            {
+                write(writer);
+            }
+            stream.Position = 0;
+            return new Reader(stream);
         }
 
         private static void WriteTimestamp(SectionWriter writer, long timestamp)
@@ -369,6 +413,227 @@ namespace PcapngFile.Tests
                 File.SetAttributes(path, FileAttributes.Normal);
                 File.Delete(path);
             }
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void ReadsRepeatedNewAndCustomInterfaceOptions(bool isBigEndian)
+        {
+            var ipv6 = Ip6Address.Append((byte)64).ToArray();
+            using var reader = CreateReader(isBigEndian, writer =>
+            {
+                WriteSectionHeader(writer);
+                WriteInterface(writer, 0, body =>
+                {
+                    WriteOption(body, 1, Encoding.UTF8.GetBytes("first")); // opt_comment
+                    WriteOption(body, 1, Encoding.UTF8.GetBytes("second"));
+                    WriteOption(body, 2, Encoding.UTF8.GetBytes("eth0\0ignored")); // if_name, ends at the zero byte
+                    WriteOption(body, 4, new byte[] { 10, 0, 0, 1, 255, 0, 0, 0 }); // if_IPv4addr
+                    WriteOption(body, 4, new byte[] { 10, 0, 0, 2, 255, 0, 0, 0 });
+                    WriteOption(body, 5, ipv6); // if_IPv6addr
+                    WriteOption(body, 6, new byte[] { 0 }); // if_MACaddr with an invalid length
+                    WriteOption(body, 15, Encoding.UTF8.GetBytes("NIC 9000")); // if_hardware
+                    WriteOption(body, 16, writer.Bytes(w => w.Write(1_000_000UL))); // if_txspeed
+                    WriteOption(body, 17, writer.Bytes(w => w.Write(2_000_000UL))); // if_rxspeed
+                    WriteOption(body, 18, Encoding.UTF8.GetBytes("Europe/Berlin")); // if_iana_tzname
+                    WriteOption(body, 2988, writer.Bytes(w => { w.Write(32473u); w.Write(Encoding.UTF8.GetBytes("text")); }));
+                    WriteOption(body, 19373, writer.Bytes(w => { w.Write(32473u); w.Write(new byte[] { 1, 2 }); }));
+                });
+            });
+
+            var block = reader.InterfaceDescriptionBlocks.Single();
+            Assert.That(block.Comment, Is.EqualTo("first"));
+            Assert.That(block.Comments, Is.EqualTo(new[] { "first", "second" }));
+            Assert.That(block.Name, Is.EqualTo("eth0"));
+            Assert.That(block.IPv4Address, Is.EqualTo(new byte[] { 10, 0, 0, 1, 255, 0, 0, 0 }));
+            Assert.That(block.IPv4Addresses.Select(a => a[3]), Is.EqualTo(new byte[] { 1, 2 }));
+            Assert.That(block.IPv6Addresses.Single(), Is.EqualTo(ipv6));
+            Assert.That(block.MacAddress, Is.Null);
+            Assert.That(block.InvalidOptionCodes, Is.EqualTo(new ushort[] { 6 }));
+            Assert.That(block.Hardware, Is.EqualTo("NIC 9000"));
+            Assert.That(block.TransmitSpeed, Is.EqualTo(1_000_000UL));
+            Assert.That(block.ReceiveSpeed, Is.EqualTo(2_000_000UL));
+            Assert.That(block.IanaTimeZoneName, Is.EqualTo("Europe/Berlin"));
+
+            Assert.That(block.CustomOptions, Has.Count.EqualTo(2));
+            Assert.That(block.CustomOptions[0].PrivateEnterpriseNumber, Is.EqualTo(32473));
+            Assert.That(block.CustomOptions[0].IsString, Is.True);
+            Assert.That(block.CustomOptions[0].IsCopyable, Is.True);
+            Assert.That(block.CustomOptions[0].GetString(), Is.EqualTo("text"));
+            Assert.That(block.CustomOptions[1].IsString, Is.False);
+            Assert.That(block.CustomOptions[1].IsCopyable, Is.False);
+            Assert.That(block.CustomOptions[1].Data, Is.EqualTo(new byte[] { 1, 2 }));
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void ReadsRepeatedAndNewPacketOptions(bool isBigEndian)
+        {
+            using var reader = CreateReader(isBigEndian, writer =>
+            {
+                WriteSectionHeader(writer);
+                WriteInterface(writer, 0);
+                WriteBlock(writer, (uint)BlockType.EnhancedPacket, body =>
+                {
+                    body.Write(0);
+                    WriteTimestamp(body, 1);
+                    body.Write(0);
+                    body.Write(0);
+                    WriteOption(body, 2, writer.Bytes(w => w.Write(0x0E00u))); // epb_flags bits 9, 10 and 11
+                    WriteOption(body, 3, new byte[] { 5, 1, 2, 3, 4 }); // epb_hash, Toeplitz
+                    WriteOption(body, 3, new byte[] { 99, 7 }); // epb_hash, unknown algorithm
+                    WriteOption(body, 5, writer.Bytes(w => w.Write(42UL))); // epb_packetid
+                    WriteOption(body, 6, writer.Bytes(w => w.Write(3u))); // epb_queue
+                    WriteOption(body, 7, writer.Bytes(w => { w.Write((byte)2); w.Write(2UL); })); // epb_verdict, XDP_PASS
+                    WriteOption(body, 7, new byte[] { 0, 0xAA, 0xBB }); // epb_verdict, hardware
+                    WriteOption(body, 8, writer.Bytes(w => { w.Write(1234u); w.Write(0u); })); // epb_processid_threadid
+                    WriteOption(body, 8, writer.Bytes(w => { w.Write(5678u); w.Write(9u); }));
+                    WriteEndOfOptions(body);
+                });
+            });
+
+            var block = reader.EnhancedPacketBlocks.Single();
+            Assert.That(block.HashAlgorithm, Is.EqualTo(HashAlgorithm.Toeplitz));
+            Assert.That(block.Hash, Is.EqualTo(new byte[] { 1, 2, 3, 4 }));
+            Assert.That(block.Hashes.Select(h => h.Algorithm), Is.EqualTo(new[] { HashAlgorithm.Toeplitz, (HashAlgorithm)99 }));
+            Assert.That(block.PacketId, Is.EqualTo(42UL));
+            Assert.That(block.Queue, Is.EqualTo(3u));
+            Assert.That(block.Verdicts, Has.Count.EqualTo(2));
+            Assert.That(block.Verdicts[0].Type, Is.EqualTo(PacketVerdictType.LinuxEbpfXdp));
+            Assert.That(block.Verdicts[0].Value, Is.EqualTo(2UL));
+            Assert.That(block.Verdicts[1].Type, Is.EqualTo(PacketVerdictType.Hardware));
+            Assert.That(block.Verdicts[1].Data, Is.EqualTo(new byte[] { 0xAA, 0xBB }));
+            Assert.That(block.Verdicts[1].Value, Is.Null);
+            Assert.That(block.ProcessThreadIds.Select(p => (p.ProcessId, p.ThreadId)), Is.EqualTo(new[] { (1234u, 0u), (5678u, 9u) }));
+            Assert.That(block.Flags.IsChecksumNotReady(), Is.True);
+            Assert.That(block.Flags.IsChecksumValid(), Is.True);
+            Assert.That(block.Flags.IsTcpSegmentationOffloaded(), Is.True);
+            Assert.That(block.InvalidOptionCodes, Is.Empty);
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void ReadsEuiNameResolutionRecords(bool isBigEndian)
+        {
+            var eui48 = new byte[] { 0x02, 0xCA, 0xFF, 0xEE, 0xF0, 0x0D };
+            var eui64 = new byte[] { 0x02, 0x34, 0x56, 0xFF, 0xFE, 0x78, 0x9A, 0xBC };
+            using var reader = CreateReader(isBigEndian, writer =>
+            {
+                WriteSectionHeader(writer);
+                WriteBlock(writer, (uint)BlockType.NameResolution, body =>
+                {
+                    WriteRecord(body, 3, eui48, "teapot");
+                    WriteRecord(body, 4, eui64, "kettle");
+                    body.Write(0u); // nrb_record_end
+                });
+            });
+
+            var records = reader.NameResolutionBlocks.Single().Records;
+            Assert.That(records.Select(r => r.RecordType), Is.EqualTo(new[] { NameResolutionRecordType.Eui48, NameResolutionRecordType.Eui64 }));
+            Assert.That(records[0].Address, Is.EqualTo(eui48));
+            Assert.That(records[0].IpAddress, Is.Null);
+            Assert.That(records[0].DnsEntries, Is.EqualTo(new[] { "teapot" }));
+            Assert.That(records[1].Address, Is.EqualTo(eui64));
+            Assert.That(records[1].DnsEntries, Is.EqualTo(new[] { "kettle" }));
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void SimplePacketDataExcludesPaddingAndHonorsSnapLength(bool isBigEndian)
+        {
+            static void WriteSimplePacket(SectionWriter writer, uint originalLength, byte[] paddedData)
+            {
+                WriteBlock(writer, (uint)BlockType.SimplePacket, body =>
+                {
+                    body.Write(originalLength);
+                    body.Write(paddedData);
+                });
+            }
+
+            using var reader = CreateReader(isBigEndian, writer =>
+            {
+                // No snap length: the data is the original length, without padding.
+                WriteSectionHeader(writer);
+                WriteInterface(writer, 0);
+                WriteSimplePacket(writer, 5, new byte[] { 1, 2, 3, 4, 5, 0, 0, 0 });
+                WriteSimplePacket(writer, 100, new byte[] { 1, 2, 3, 4, 5, 6, 7, 8 });
+
+                // The first interface's snap length applies, not a later interface's.
+                WriteSectionHeader(writer);
+                WriteInterface(writer, 3);
+                WriteInterface(writer, 0);
+                WriteSimplePacket(writer, 6, new byte[] { 1, 2, 3, 0 });
+            });
+
+            var packets = reader.SimplePacketBlocks.ToArray();
+            Assert.That(packets.Select(p => p.Data.Length), Is.EqualTo(new[] { 5, 8, 3 }));
+            Assert.That(packets.Select(p => p.DataLength), Is.EqualTo(new uint[] { 5, 100, 6 }));
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void SkipsSectionsWithUnsupportedMajorVersion(bool isBigEndian)
+        {
+            using var reader = CreateReader(isBigEndian, writer =>
+            {
+                WriteSectionHeader(writer, majorVersion: 2, userApplication: "future");
+                WriteInterface(writer, 0);
+                WriteSectionHeader(writer, majorVersion: 1, minorVersion: 2, userApplication: "minor 2");
+                WriteInterface(writer, 96);
+            });
+
+            var blocks = reader.AllBlocks.ToArray();
+            Assert.That(blocks.Select(b => b.StoreType), Is.EqualTo(new[] { BlockType.SectionHeader, BlockType.InterfaceDescription }));
+            Assert.That(((SectionHeaderBlock)blocks[0]).UserApplication, Is.EqualTo("minor 2"));
+            Assert.That(((InterfaceDescriptionBlock)blocks[1]).SnapLength, Is.EqualTo(96));
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void ReadsPacketBlockTimestampAndHashes(bool isBigEndian)
+        {
+            using var reader = CreateReader(isBigEndian, writer =>
+            {
+                WriteSectionHeader(writer);
+                WriteInterface(writer, 0);
+                WriteBlock(writer, (uint)BlockType.Packet, body =>
+                {
+                    body.Write((ushort)0);
+                    body.Write((ushort)7);
+                    WriteTimestamp(body, PacketTimestamp);
+                    body.Write(3u);
+                    body.Write(3u);
+                    body.Write(new byte[] { 1, 2, 3, 0 });
+                    WriteOption(body, 3, new byte[] { 2, 0xDE, 0xAD, 0xBE, 0xEF }); // pack_hash
+                    WriteOption(body, 3, new byte[] { 4, 1 });
+                    WriteEndOfOptions(body);
+                });
+            });
+
+            var blocks = reader.AllBlocks.ToArray();
+            var iface = blocks.OfType<InterfaceDescriptionBlock>().Single();
+            var packet = blocks.OfType<PacketBlock>().Single();
+            Assert.That(packet.Timestamp, Is.EqualTo(PacketTimestamp));
+            Assert.That(packet.GetTimestamp(iface, out _), Is.EqualTo(DateTime.UnixEpoch.AddTicks(PacketTimestamp * 10)));
+            Assert.That(packet.DropsCount, Is.EqualTo(7));
+            Assert.That(packet.Data, Is.EqualTo(new byte[] { 1, 2, 3 }));
+            Assert.That(packet.Hashes.Select(h => h.Algorithm), Is.EqualTo(new[] { HashAlgorithm.Crc32, HashAlgorithm.Sha1 }));
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void ConvertsInterfaceStatisticsTimestamps(bool isBigEndian)
+        {
+            using var reader = CreateReader(isBigEndian);
+            var blocks = reader.AllBlocks.ToArray();
+            var iface = blocks.OfType<InterfaceDescriptionBlock>().Single();
+            var statistics = blocks.OfType<InterfaceStatisticsBlock>().Single();
+
+            // The interface uses nanoseconds (if_tsresol 9) and an if_tsoffset of -5 seconds.
+            static DateTime Expected(long nanoseconds) => DateTime.UnixEpoch.AddTicks(nanoseconds / 100).AddSeconds(-5);
+            Assert.That(statistics.GetTimestamp(iface, out _), Is.EqualTo(Expected(PacketTimestamp)));
+            Assert.That(statistics.GetStartTime(iface), Is.EqualTo(Expected(StatisticsStartTime)));
+            Assert.That(statistics.GetEndTime(iface), Is.Null);
         }
 
         private sealed class UnseekableStream : MemoryStream

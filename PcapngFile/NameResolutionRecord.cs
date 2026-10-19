@@ -37,11 +37,11 @@ namespace PcapngFile
     public class NameResolutionRecord
     {
         private const UInt16 EndRecordType = 0;
-        private const UInt16 Ip4RecordType = 1;
-        private const UInt16 Ip6RecordType = 2;
 
         private const int Ip4Length = 4;
         private const int Ip6Length = 16;
+        private const int Eui48Length = 6;
+        private const int Eui64Length = 8;
         private const int ValueAlignmentBoundary = 4;
 
         /// <summary>
@@ -50,19 +50,29 @@ namespace PcapngFile
         public bool IsIpVersion6 { get; private set; }
 
         /// <summary>
-        /// Gets the network address.
+        /// Gets the IP address, or <c>null</c> for EUI records. See <see cref="Address"/> for every record type.
         /// </summary>
-        public byte[] IpAddress { get; private set; }
+        public byte[] IpAddress => this.RecordType is NameResolutionRecordType.IPv4 or NameResolutionRecordType.IPv6 ? this.Address : null;
 
         /// <summary>
-        /// Gets the host names for <see cref="IpAddress"/>.
+        /// Gets the type of <see cref="Address"/>.
+        /// </summary>
+        public NameResolutionRecordType RecordType { get; }
+
+        /// <summary>
+        /// Gets the address: an IPv4, IPv6, EUI-48 (MAC) or EUI-64 address depending on <see cref="RecordType"/>.
+        /// </summary>
+        public byte[] Address { get; }
+
+        /// <summary>
+        /// Gets the names resolved for <see cref="Address"/>.
         /// </summary>
         public ReadOnlyCollection<string> DnsEntries { get; private set; }
 
         internal bool IsEndRecord { get; }
 
         // False for record types this library does not support, which are skipped.
-        internal bool IsSupported => this.IpAddress != null;
+        internal bool IsSupported => this.Address != null;
 
         internal NameResolutionRecord(BinaryReader reader)
         {
@@ -76,18 +86,28 @@ namespace PcapngFile
                 _ = reader.ReadBytes(ValueAlignmentBoundary - remainderLength);     // Read fill bytes to boundary.
             }
 
-            int addressLength;
-            switch (type)
+            if (type == EndRecordType)
             {
-                case EndRecordType:
-                    this.IsEndRecord = true;
-                    return;
-                case Ip4RecordType:
+                this.IsEndRecord = true;
+                return;
+            }
+
+            this.RecordType = (NameResolutionRecordType)type;
+            int addressLength;
+            switch (this.RecordType)
+            {
+                case NameResolutionRecordType.IPv4:
                     addressLength = Ip4Length;
                     break;
-                case Ip6RecordType:
+                case NameResolutionRecordType.IPv6:
                     this.IsIpVersion6 = true;
                     addressLength = Ip6Length;
+                    break;
+                case NameResolutionRecordType.Eui48:
+                    addressLength = Eui48Length;
+                    break;
+                case NameResolutionRecordType.Eui64:
+                    addressLength = Eui64Length;
                     break;
                 default:
                     return;
@@ -97,7 +117,7 @@ namespace PcapngFile
             {
                 throw new IOException("Name resolution record is shorter than its address (type = " + type + ", length = " + valueLength + ").");
             }
-            this.IpAddress = value[..addressLength];
+            this.Address = value[..addressLength];
             this.DnsEntries = ReadDnsEntries(value[addressLength..]);
         }
 

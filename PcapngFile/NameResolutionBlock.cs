@@ -29,7 +29,6 @@ namespace PcapngFile
     using System.Collections.Generic;
     using System.Collections.ObjectModel;
     using System.IO;
-    using System.Text;
 
     /// <summary>
     /// Maps network addresses to host names.
@@ -79,13 +78,15 @@ namespace PcapngFile
             switch (code)
             {
                 case NameServerIp4AddressOptionCode:
+                    RequireLength(value, 4);
                     this.NameServerIp4Address = value;
                     break;
                 case NameServerIp6AddressOptionCode:
+                    RequireLength(value, 16);
                     this.NameServerIp6Address = value;
                     break;
                 case NameServerNameOptionCode:
-                    this.NameServerName = Encoding.UTF8.GetString(value);
+                    this.NameServerName = ToUtf8String(value);
                     break;
             }
         }

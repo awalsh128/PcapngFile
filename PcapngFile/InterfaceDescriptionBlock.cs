@@ -26,8 +26,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 namespace PcapngFile
 {
     using System;
+    using System.Collections.Generic;
+    using System.Collections.ObjectModel;
     using System.IO;
-    using System.Text;
 
     /// <summary>
     /// Describes a network interface that packets were captured on.
@@ -49,6 +50,18 @@ namespace PcapngFile
         private const UInt16 TimeOffsetSecondsOptionCode = 14;
         private const UInt16 TimeZoneOptionCode = 10;
         private const UInt16 TimestampResolutionOptionCode = 9;
+        private const UInt16 HardwareOptionCode = 15;
+        private const UInt16 TransmitSpeedOptionCode = 16;
+        private const UInt16 ReceiveSpeedOptionCode = 17;
+        private const UInt16 IanaTimeZoneNameOptionCode = 18;
+
+        private const int IPv4AddressLength = 8;
+        private const int IPv6AddressLength = 17;
+        private const int MacAddressLength = 6;
+        private const int EuiAddressLength = 8;
+
+        private readonly List<byte[]> ipv4Addresses = new List<byte[]>();
+        private readonly List<byte[]> ipv6Addresses = new List<byte[]>();
 
         private TimestampTransformer timestampTransformer;
 
@@ -73,14 +86,46 @@ namespace PcapngFile
         public int FrameCheckSequence { get; private set; }
 
         /// <summary>
-        /// Gets the interface's IPv4 address and netmask (if_IPv4addr), or <c>null</c> if there are none.
+        /// Gets the interface's first IPv4 address and netmask (if_IPv4addr), or <c>null</c> if there are none.
         /// </summary>
-        public byte[] IPv4Address { get; private set; }
+        /// <remarks>The first 4 bytes are the address and the last 4 the netmask.</remarks>
+        public byte[] IPv4Address => this.ipv4Addresses.Count > 0 ? this.ipv4Addresses[0] : null;
 
         /// <summary>
-        /// Gets the interface's IPv6 address and prefix length (if_IPv6addr), or <c>null</c> if there are none.
+        /// Gets all of the interface's IPv4 addresses and netmasks (if_IPv4addr), in file order.
         /// </summary>
-        public byte[] IPv6Address { get; private set; }
+        public IReadOnlyList<byte[]> IPv4Addresses { get; }
+
+        /// <summary>
+        /// Gets the interface's first IPv6 address and prefix length (if_IPv6addr), or <c>null</c> if there are none.
+        /// </summary>
+        /// <remarks>The first 16 bytes are the address and the last byte the prefix length.</remarks>
+        public byte[] IPv6Address => this.ipv6Addresses.Count > 0 ? this.ipv6Addresses[0] : null;
+
+        /// <summary>
+        /// Gets all of the interface's IPv6 addresses and prefix lengths (if_IPv6addr), in file order.
+        /// </summary>
+        public IReadOnlyList<byte[]> IPv6Addresses { get; }
+
+        /// <summary>
+        /// Gets a description of the interface hardware (if_hardware), or <c>null</c> if there is none.
+        /// </summary>
+        public string Hardware { get; private set; }
+
+        /// <summary>
+        /// Gets the interface transmit speed in bits per second (if_txspeed), or <c>null</c> if there is none.
+        /// </summary>
+        public UInt64? TransmitSpeed { get; private set; }
+
+        /// <summary>
+        /// Gets the interface receive speed in bits per second (if_rxspeed), or <c>null</c> if there is none.
+        /// </summary>
+        public UInt64? ReceiveSpeed { get; private set; }
+
+        /// <summary>
+        /// Gets the IANA time zone database name of the interface's time zone (if_iana_tzname), or <c>null</c> if there is none.
+        /// </summary>
+        public string IanaTimeZoneName { get; private set; }
 
         /// <summary>
         /// Gets the link layer type of the interface.
@@ -133,6 +178,8 @@ namespace PcapngFile
         internal InterfaceDescriptionBlock(BinaryReader reader)
             : base(reader)
         {
+            this.IPv4Addresses = new ReadOnlyCollection<byte[]>(this.ipv4Addresses);
+            this.IPv6Addresses = new ReadOnlyCollection<byte[]>(this.ipv6Addresses);
             this.LinkType = (LinkType)reader.ReadUInt16();
             _ = reader.ReadUInt16(); // Reserved field.
             this.SnapLength = reader.ReadInt32();
@@ -153,31 +200,48 @@ namespace PcapngFile
             switch (code)
             {
                 case DescriptionOptionCode:
-                    this.Description = Encoding.UTF8.GetString(value);
+                    this.Description = ToUtf8String(value);
                     break;
                 case EuiAddressOptionCode:
+                    RequireLength(value, EuiAddressLength);
                     this.EuiAddress = value;
                     break;
                 case FilterOptionCode:
-                    this.Filter = value; // TODO Dig into spec and get actual data type.
+                    RequireMinimumLength(value, 1);
+                    this.Filter = value; // The spec doesn't define the filter formats yet.
                     break;
                 case FrameCheckSequenceOptionCode:
-                    this.FrameCheckSequence = value[0];
+                    this.FrameCheckSequence = ToByte(value);
                     break;
                 case IPv4AddressOptionCode:
-                    this.IPv4Address = value;
+                    RequireLength(value, IPv4AddressLength);
+                    this.ipv4Addresses.Add(value);
                     break;
                 case IPv6AddressOptionCode:
-                    this.IPv6Address = value;
+                    RequireLength(value, IPv6AddressLength);
+                    this.ipv6Addresses.Add(value);
                     break;
                 case MacAddressOptionCode:
+                    RequireLength(value, MacAddressLength);
                     this.MacAddress = value;
                     break;
                 case NameOptionCode:
-                    this.Name = Encoding.UTF8.GetString(value);
+                    this.Name = ToUtf8String(value);
                     break;
                 case OperatingSystemOptionCode:
-                    this.OperatingSystem = Encoding.UTF8.GetString(value);
+                    this.OperatingSystem = ToUtf8String(value);
+                    break;
+                case HardwareOptionCode:
+                    this.Hardware = ToUtf8String(value);
+                    break;
+                case TransmitSpeedOptionCode:
+                    this.TransmitSpeed = this.ToUInt64(value);
+                    break;
+                case ReceiveSpeedOptionCode:
+                    this.ReceiveSpeed = this.ToUInt64(value);
+                    break;
+                case IanaTimeZoneNameOptionCode:
+                    this.IanaTimeZoneName = ToUtf8String(value);
                     break;
                 case SpeedOptionCode:
                     this.Speed = this.ToInt64(value);
@@ -189,7 +253,7 @@ namespace PcapngFile
                     this.TimeZone = this.ToInt32(value); // GMT offset
                     break;
                 case TimestampResolutionOptionCode:
-                    this.TimestampResolution = value[0]; // TODO Dig into spec and get actual data type.
+                    this.TimestampResolution = ToByte(value);
                     break;
             }
         }
