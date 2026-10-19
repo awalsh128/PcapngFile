@@ -1,0 +1,49 @@
+name: Publish NuGet Package
+
+# Publishes the package defined in PcapngFile/PcapngFile.nuget.props to https://www.nuget.org/packages/PcapngFile/.
+# Authenticates with NuGet Trusted Publishing, which needs a trusted publishing policy on nuget.org for
+# this repository and workflow file (publish.yml); no API key secret is stored in the repository.
+on:
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: Build and pack without pushing to nuget.org
+        type: boolean
+        default: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: nuget
+    permissions:
+      contents: read
+      id-token: write # Needed to request the OIDC token for NuGet Trusted Publishing.
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 10.0.x
+    - name: Restore dependencies
+      run: dotnet restore
+    - name: Build
+      run: dotnet build --no-restore --configuration Release -p:ContinuousIntegrationBuild=true
+    - name: Test
+      run: dotnet test --no-build --configuration Release --verbosity normal
+    - name: Pack
+      run: dotnet pack PcapngFile/PcapngFile.csproj --no-build --configuration Release --output artifacts
+    - uses: actions/upload-artifact@v4
+      with:
+        name: nuget-package
+        path: artifacts/*
+    - name: Log in to nuget.org
+      if: ${{ !inputs.dry-run }}
+      uses: NuGet/login@v1
+      id: login
+      with:
+        user: awalsh128
+    - name: Push to nuget.org
+      if: ${{ !inputs.dry-run }}
+      # The symbol package (.snupkg) is pushed alongside the .nupkg automatically.
+      run: dotnet nuget push "artifacts/*.nupkg" --api-key "${{ steps.login.outputs.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json
