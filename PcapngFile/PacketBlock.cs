@@ -1,5 +1,5 @@
 ﻿/*
-Copyright (c) 2021, Andrew Walsh
+Copyright (c) 2013-2026, Andrew Walsh
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -25,49 +25,96 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace PcapngFile
 {
-  using System;
-  using System.IO;
+    using System;
+    using System.IO;
 
-  public class PacketBlock : BlockBase
-  {
-    private const UInt16 FlagsOptionCode = 2;
-    private const UInt16 HashOptionCode = 3;
-
-    public UInt32 CapturedLength { get; private set; }
-    public byte[] Data { get; private set; }
-    public UInt32 DataLength { get; private set; }
-    public UInt16 DropsCount { get; private set; }
-    public PacketOptionFlags Flags { get; private set; }
-    public byte[] Hash { get; private set; }
-    public HashAlgorithm HashAlgorithm { get; private set; }
-    public UInt16 InterfaceID { get; private set; }
-    public DateTime Timestamp { get; private set; }
-
-    internal PacketBlock(BinaryReader reader)
-        : base(reader)
+    /// <summary>
+    /// A captured packet in the obsolete Packet Block format. New files use <see cref="EnhancedPacketBlock"/> instead.
+    /// </summary>
+    public class PacketBlock : BlockBase
     {
-      this.InterfaceID = reader.ReadUInt16();
-      this.DropsCount = reader.ReadUInt16();
-      this.Timestamp = DateTime.FromBinary(reader.ReadInt64());
-      this.CapturedLength = reader.ReadUInt32();
-      this.DataLength = reader.ReadUInt32();
-      this.Data = reader.ReadBytes((int)this.CapturedLength);
-      this.TryReadOptions(reader);
-      this.ReadClosingField(reader);
-    }
+        private const int DataAlignmentBoundary = 4;
+        private const UInt16 FlagsOptionCode = 2;
+        private const UInt16 HashOptionCode = 3;
 
-    protected override void OnReadOptionsCode(UInt16 code, byte[] value)
-    {
-      switch (code)
-      {
-        case FlagsOptionCode:
-          this.Flags = new PacketOptionFlags(value);
-          break;
-        case HashOptionCode:
-          this.HashAlgorithm = (HashAlgorithm)value[0];
-          Array.Copy(value, 1, this.Hash, 0, value.Length - 1);
-          break;
-      }
+        /// <summary>
+        /// Gets the number of packet bytes captured, which can be less than <see cref="DataLength"/> if the packet was truncated.
+        /// </summary>
+        public UInt32 CapturedLength { get; private set; }
+
+        /// <summary>
+        /// Gets the captured packet data.
+        /// </summary>
+        public byte[] Data { get; private set; }
+
+        /// <summary>
+        /// Gets the original length of the packet on the wire.
+        /// </summary>
+        public UInt32 DataLength { get; private set; }
+
+        /// <summary>
+        /// Gets the number of packets lost between this packet and the preceding one.
+        /// </summary>
+        public UInt16 DropsCount { get; private set; }
+
+        /// <summary>
+        /// Gets the packet flags (pack_flags), or <c>null</c> if there are none.
+        /// </summary>
+        public PacketOptionFlags Flags { get; private set; }
+
+        /// <summary>
+        /// Gets the packet hash (pack_hash), or <c>null</c> if there is none.
+        /// </summary>
+        public byte[] Hash { get; private set; }
+
+        /// <summary>
+        /// Gets the algorithm used to compute <see cref="Hash"/>.
+        /// </summary>
+        public HashAlgorithm HashAlgorithm { get; private set; }
+
+        /// <summary>
+        /// Gets the zero-based index of the <see cref="InterfaceDescriptionBlock"/> in this section that the packet was captured on.
+        /// </summary>
+        public UInt16 InterfaceID { get; private set; }
+
+        /// <summary>
+        /// Gets the time the packet was captured.
+        /// </summary>
+        public DateTime Timestamp { get; private set; }
+
+        internal PacketBlock(BinaryReader reader)
+            : base(reader)
+        {
+            this.InterfaceID = reader.ReadUInt16();
+            this.DropsCount = reader.ReadUInt16();
+            this.Timestamp = DateTime.FromBinary(reader.ReadInt64());
+            this.CapturedLength = reader.ReadUInt32();
+            this.DataLength = reader.ReadUInt32();
+            this.Data = reader.ReadBytes((int)this.CapturedLength);
+
+            int remainderLength = (int)(this.CapturedLength % DataAlignmentBoundary);
+            if (remainderLength > 0)
+            {
+                _ = reader.ReadBytes(DataAlignmentBoundary - remainderLength);
+            }
+
+            this.TryReadOptions(reader);
+            this.ReadClosingField(reader);
+        }
+
+        /// <inheritdoc/>
+        protected override void OnReadOptionsCode(UInt16 code, byte[] value)
+        {
+            switch (code)
+            {
+                case FlagsOptionCode:
+                    this.Flags = new PacketOptionFlags(this.ToUInt32(value));
+                    break;
+                case HashOptionCode:
+                    this.HashAlgorithm = GetHashAlgorithm(value[0]);
+                    this.Hash = value[1..];
+                    break;
+            }
+        }
     }
-  }
 }

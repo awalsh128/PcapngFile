@@ -1,5 +1,5 @@
 ﻿/*
-Copyright (c) 2021, Andrew Walsh
+Copyright (c) 2013-2026, Andrew Walsh
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -25,79 +25,100 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace PcapngFile
 {
-  using System;
-  using System.Collections.Generic;
-  using System.Collections.ObjectModel;
-  using System.IO;
-  using System.Text;
+    using System;
+    using System.Collections.Generic;
+    using System.Collections.ObjectModel;
+    using System.IO;
+    using System.Text;
 
-  public class NameResolutionRecord
-  {
-    private const UInt16 EndRecordType = 0;
-    private const UInt16 Ip4RecordType = 1;
-    private const UInt16 Ip6RecordType = 2;
-
-    private const int Ip4Length = 4;
-    private const int Ip6Length = 8;
-    private const int ValueAlignmentBoundary = 4;
-
-    public bool IsIpVersion6 { get; private set; }
-    public byte[] IpAddress { get; private set; }
-    public ReadOnlyCollection<string> DnsEntries { get; private set; }
-
-    internal NameResolutionRecord(BinaryReader reader)
+    /// <summary>
+    /// Maps one network address to one or more host names.
+    /// </summary>
+    public class NameResolutionRecord
     {
-      UInt16 type = reader.ReadUInt16();
-      int valueLength = reader.ReadUInt16();
+        private const UInt16 EndRecordType = 0;
+        private const UInt16 Ip4RecordType = 1;
+        private const UInt16 Ip6RecordType = 2;
 
-      if (type != EndRecordType)
-      {
-        int entriesLength = valueLength;
+        private const int Ip4Length = 4;
+        private const int Ip6Length = 16;
+        private const int ValueAlignmentBoundary = 4;
 
-        if (type == Ip6RecordType)
-        {
-          this.IsIpVersion6 = true;
-          this.IpAddress = reader.ReadBytes(Ip6Length);
-          entriesLength -= Ip6Length;
-        }
-        else if (type == Ip4RecordType)
-        {
-          this.IsIpVersion6 = false;
-          this.IpAddress = reader.ReadBytes(Ip4Length);
-          entriesLength -= Ip4Length;
-        }
-        else
-        {
-          throw new IOException("Name resolution record found unknown type (type = " + type + ")");
-        }
-        this.DnsEntries = ReadDnsEntries(reader, entriesLength);
+        /// <summary>
+        /// Gets whether <see cref="IpAddress"/> is an IPv6 address rather than IPv4.
+        /// </summary>
+        public bool IsIpVersion6 { get; private set; }
 
-        int remainderLength = valueLength % ValueAlignmentBoundary;
-        if (remainderLength > 0)
+        /// <summary>
+        /// Gets the network address.
+        /// </summary>
+        public byte[] IpAddress { get; private set; }
+
+        /// <summary>
+        /// Gets the host names for <see cref="IpAddress"/>.
+        /// </summary>
+        public ReadOnlyCollection<string> DnsEntries { get; private set; }
+
+        internal bool IsEndRecord { get; }
+
+        // False for record types this library does not support, which are skipped.
+        internal bool IsSupported => this.IpAddress != null;
+
+        internal NameResolutionRecord(BinaryReader reader)
         {
-          _ = reader.ReadBytes(ValueAlignmentBoundary - remainderLength);     // Read fill bytes to boundary.
+            UInt16 type = reader.ReadUInt16();
+            int valueLength = reader.ReadUInt16();
+            byte[] value = reader.ReadBytes(valueLength);
+
+            int remainderLength = valueLength % ValueAlignmentBoundary;
+            if (remainderLength > 0)
+            {
+                _ = reader.ReadBytes(ValueAlignmentBoundary - remainderLength);     // Read fill bytes to boundary.
+            }
+
+            int addressLength;
+            switch (type)
+            {
+                case EndRecordType:
+                    this.IsEndRecord = true;
+                    return;
+                case Ip4RecordType:
+                    addressLength = Ip4Length;
+                    break;
+                case Ip6RecordType:
+                    this.IsIpVersion6 = true;
+                    addressLength = Ip6Length;
+                    break;
+                default:
+                    return;
+            }
+
+            if (valueLength < addressLength)
+            {
+                throw new IOException("Name resolution record is shorter than its address (type = " + type + ", length = " + valueLength + ").");
+            }
+            this.IpAddress = value[..addressLength];
+            this.DnsEntries = ReadDnsEntries(value[addressLength..]);
         }
-      }
+
+        private static ReadOnlyCollection<string> ReadDnsEntries(byte[] entriesBuffer)
+        {
+            var entries = new List<string>();
+            int entriesLength = entriesBuffer.Length;
+            int i = 0, j = 0;
+            while (j < entriesLength)
+            {
+                if (entriesBuffer[j] == 0)
+                {
+                    entries.Add(UTF8Encoding.UTF8.GetString(entriesBuffer, i, j - i));
+                    i = ++j;
+                }
+                else
+                {
+                    j++;
+                }
+            }
+            return new ReadOnlyCollection<string>(entries);
+        }
     }
-
-    private static ReadOnlyCollection<string> ReadDnsEntries(BinaryReader reader, int entriesLength)
-    {
-      var entries = new List<string>();
-      byte[] entriesBuffer = reader.ReadBytes(entriesLength);
-      int i = 0, j = 0;
-      while (j < entriesLength)
-      {
-        if (entriesBuffer[j] == 0)
-        {
-          entries.Add(UTF8Encoding.UTF8.GetString(entriesBuffer, i, j - i));
-          i = ++j;
-        }
-        else
-        {
-          j++;
-        }
-      }
-      return new ReadOnlyCollection<string>(entries);
-    }
-  }
 }

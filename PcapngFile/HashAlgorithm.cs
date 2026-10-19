@@ -1,5 +1,5 @@
 ﻿/*
-Copyright (c) 2021, Andrew Walsh
+Copyright (c) 2013-2026, Andrew Walsh
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -25,12 +25,34 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace PcapngFile
 {
-  public enum HashAlgorithm
-  {
-    Crc32 = 2,
-    MD5 = 3,
-    Sha1 = 4,
-    TwosComplement = 0,
-    Xor = 1
-  }
+    /// <summary>
+    /// The algorithms that can be used to hash a packet.
+    /// </summary>
+    public enum HashAlgorithm
+    {
+        /// <summary>
+        /// 32-bit cyclic redundancy check.
+        /// </summary>
+        Crc32 = 2,
+
+        /// <summary>
+        /// MD5 digest.
+        /// </summary>
+        MD5 = 3,
+
+        /// <summary>
+        /// SHA-1 digest.
+        /// </summary>
+        Sha1 = 4,
+
+        /// <summary>
+        /// Two's complement checksum.
+        /// </summary>
+        TwosComplement = 0,
+
+        /// <summary>
+        /// XOR checksum.
+        /// </summary>
+        Xor = 1
+    }
 }

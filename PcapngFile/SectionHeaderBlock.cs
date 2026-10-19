@@ -1,5 +1,5 @@
 ﻿/*
-Copyright (c) 2021, Andrew Walsh
+Copyright (c) 2013-2026, Andrew Walsh
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -25,49 +25,80 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace PcapngFile
 {
-  using System;
-  using System.IO;
-  using System.Text;
+    using System;
+    using System.IO;
+    using System.Text;
 
-  public class SectionHeaderBlock : BlockBase
-  {
-    private const UInt16 HardwareOptionCode = 2;
-    private const UInt16 OperatingSystemOptionCode = 3;
-    private const UInt16 UserApplicationOptionCode = 4;
-
-    public UInt32 ByteOrderMagic { get; private set; }
-    public string Hardware { get; private set; }
-    public UInt16 MajorVersion { get; private set; }
-    public UInt16 MinorVersion { get; private set; }
-    public string OperatingSystem { get; private set; }
-    public Int64 SectionLength { get; private set; }
-    public string UserApplication { get; private set; }
-
-    internal SectionHeaderBlock(BinaryReader reader)
-        : base(reader)
+    /// <summary>
+    /// Starts a section of the file. Every other block belongs to the section before it.
+    /// </summary>
+    public class SectionHeaderBlock : BlockBase
     {
-      this.ByteOrderMagic = reader.ReadUInt32();
-      this.MajorVersion = reader.ReadUInt16();
-      this.MinorVersion = reader.ReadUInt16();
-      this.SectionLength = reader.ReadInt64();
-      this.TryReadOptions(reader);
-      this.ReadClosingField(reader);
-    }
+        private const UInt16 HardwareOptionCode = 2;
+        private const UInt16 OperatingSystemOptionCode = 3;
+        private const UInt16 UserApplicationOptionCode = 4;
 
-    protected override void OnReadOptionsCode(UInt16 code, byte[] value)
-    {
-      switch (code)
-      {
-        case HardwareOptionCode:
-          this.Hardware = Encoding.UTF8.GetString(value);
-          break;
-        case OperatingSystemOptionCode:
-          this.OperatingSystem = Encoding.UTF8.GetString(value);
-          break;
-        case UserApplicationOptionCode:
-          this.UserApplication = Encoding.UTF8.GetString(value);
-          break;
-      }
+        /// <summary>
+        /// Gets the byte order magic number (0x1A2B3C4D) used to detect the section's byte order.
+        /// </summary>
+        public UInt32 ByteOrderMagic { get; private set; }
+
+        /// <summary>
+        /// Gets the hardware used to create the section (shb_hardware), or <c>null</c> if there is none.
+        /// </summary>
+        public string Hardware { get; private set; }
+
+        /// <summary>
+        /// Gets the major version of the file format.
+        /// </summary>
+        public UInt16 MajorVersion { get; private set; }
+
+        /// <summary>
+        /// Gets the minor version of the file format.
+        /// </summary>
+        public UInt16 MinorVersion { get; private set; }
+
+        /// <summary>
+        /// Gets the operating system used to create the section (shb_os), or <c>null</c> if there is none.
+        /// </summary>
+        public string OperatingSystem { get; private set; }
+
+        /// <summary>
+        /// Gets the length of the section in bytes, or -1 if it is not specified.
+        /// </summary>
+        public Int64 SectionLength { get; private set; }
+
+        /// <summary>
+        /// Gets the application used to create the section (shb_userappl), or <c>null</c> if there is none.
+        /// </summary>
+        public string UserApplication { get; private set; }
+
+        internal SectionHeaderBlock(BinaryReader reader)
+            : base(reader)
+        {
+            this.ByteOrderMagic = reader.ReadUInt32();
+            this.MajorVersion = reader.ReadUInt16();
+            this.MinorVersion = reader.ReadUInt16();
+            this.SectionLength = reader.ReadInt64();
+            this.TryReadOptions(reader);
+            this.ReadClosingField(reader);
+        }
+
+        /// <inheritdoc/>
+        protected override void OnReadOptionsCode(UInt16 code, byte[] value)
+        {
+            switch (code)
+            {
+                case HardwareOptionCode:
+                    this.Hardware = Encoding.UTF8.GetString(value);
+                    break;
+                case OperatingSystemOptionCode:
+                    this.OperatingSystem = Encoding.UTF8.GetString(value);
+                    break;
+                case UserApplicationOptionCode:
+                    this.UserApplication = Encoding.UTF8.GetString(value);
+                    break;
+            }
+        }
     }
-  }
 }

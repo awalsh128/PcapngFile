@@ -1,5 +1,5 @@
 ﻿/*
-Copyright (c) 2021, Andrew Walsh
+Copyright (c) 2013-2026, Andrew Walsh
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -25,60 +25,85 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace PcapngFile
 {
-  using System;
-  using System.Collections.Generic;
-  using System.Collections.ObjectModel;
-  using System.IO;
-  using System.Text;
+    using System;
+    using System.Collections.Generic;
+    using System.Collections.ObjectModel;
+    using System.IO;
+    using System.Text;
 
-  public class NameResolutionBlock : BlockBase
-  {
-    private const UInt16 NameServerIp4AddressOptionCode = 3;
-    private const UInt16 NameServerIp6AddressOptionCode = 4;
-    private const UInt16 NameServerNameOptionCode = 2;
-
-    public bool IsIpVersion6 => this.NameServerIp4Address == null;
-
-    public byte[] NameServerIp4Address { get; private set; }
-    public byte[] NameServerIp6Address { get; private set; }
-    public string NameServerName { get; private set; }
-    public ReadOnlyCollection<NameResolutionRecord> Records { get; private set; }
-
-    internal NameResolutionBlock(BinaryReader reader)
-        : base(reader)
+    /// <summary>
+    /// Maps network addresses to host names.
+    /// </summary>
+    public class NameResolutionBlock : BlockBase
     {
-      this.Records = ReadRecords(reader);
-      this.TryReadOptions(reader);
-      this.ReadClosingField(reader);
-    }
+        private const UInt16 NameServerIp4AddressOptionCode = 3;
+        private const UInt16 NameServerIp6AddressOptionCode = 4;
+        private const UInt16 NameServerNameOptionCode = 2;
 
-    protected override void OnReadOptionsCode(UInt16 code, byte[] value)
-    {
-      switch (code)
-      {
-        case NameServerIp4AddressOptionCode:
-          this.NameServerIp4Address = value;
-          break;
-        case NameServerIp6AddressOptionCode:
-          this.NameServerIp6Address = value;
-          break;
-        case NameServerNameOptionCode:
-          this.NameServerName = Encoding.UTF8.GetString(value);
-          break;
-      }
-    }
+        /// <summary>
+        /// Gets whether the name server address is IPv6 rather than IPv4.
+        /// </summary>
+        public bool IsIpVersion6 => this.NameServerIp4Address == null;
 
-    private static ReadOnlyCollection<NameResolutionRecord> ReadRecords(BinaryReader reader)
-    {
-      var records = new List<NameResolutionRecord>();
-      var record = new NameResolutionRecord(reader);
-      while (record.IpAddress != null)
-      {
-        records.Add(record);
-        record = new NameResolutionRecord(reader);
-      }
+        /// <summary>
+        /// Gets the IPv4 address of the DNS server (ns_dnsIP4addr), or <c>null</c> if there is none.
+        /// </summary>
+        public byte[] NameServerIp4Address { get; private set; }
 
-      return new ReadOnlyCollection<NameResolutionRecord>(records);
+        /// <summary>
+        /// Gets the IPv6 address of the DNS server (ns_dnsIP6addr), or <c>null</c> if there is none.
+        /// </summary>
+        public byte[] NameServerIp6Address { get; private set; }
+
+        /// <summary>
+        /// Gets the name of the DNS server (ns_dnsname), or <c>null</c> if there is none.
+        /// </summary>
+        public string NameServerName { get; private set; }
+
+        /// <summary>
+        /// Gets the address to name records in the block.
+        /// </summary>
+        public ReadOnlyCollection<NameResolutionRecord> Records { get; private set; }
+
+        internal NameResolutionBlock(BinaryReader reader)
+            : base(reader)
+        {
+            this.Records = ReadRecords(reader);
+            this.TryReadOptions(reader);
+            this.ReadClosingField(reader);
+        }
+
+        /// <inheritdoc/>
+        protected override void OnReadOptionsCode(UInt16 code, byte[] value)
+        {
+            switch (code)
+            {
+                case NameServerIp4AddressOptionCode:
+                    this.NameServerIp4Address = value;
+                    break;
+                case NameServerIp6AddressOptionCode:
+                    this.NameServerIp6Address = value;
+                    break;
+                case NameServerNameOptionCode:
+                    this.NameServerName = Encoding.UTF8.GetString(value);
+                    break;
+            }
+        }
+
+        private static ReadOnlyCollection<NameResolutionRecord> ReadRecords(BinaryReader reader)
+        {
+            var records = new List<NameResolutionRecord>();
+            var record = new NameResolutionRecord(reader);
+            while (!record.IsEndRecord)
+            {
+                if (record.IsSupported)
+                {
+                    records.Add(record);
+                }
+                record = new NameResolutionRecord(reader);
+            }
+
+            return new ReadOnlyCollection<NameResolutionRecord>(records);
+        }
     }
-  }
 }

@@ -1,5 +1,5 @@
 ﻿/*
-Copyright (c) 2021, Andrew Walsh
+Copyright (c) 2013-2026, Andrew Walsh
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -25,97 +25,187 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace PcapngFile
 {
-  using System;
+    using System;
 
-  public class PacketOptionFlags
-  {
-    private const uint InboundMask = 0x00000001;
-    private const uint OutboundMask = 0x00000002;
-    private const uint UnicastMask = 0x00000004;
-    private const uint MulticastMask = 0x00000008;
-    private const uint BroadcastMask = 0x0000000C;
-    private const uint PromiscuousMask = 0x00000010;
-    private const uint FcsLengthMask = 0x000001E0;
-    private const int FcsLengthOffset = 5;
-    private const uint LinkLayerSymbolErrorMask = 0x80000000;
-    private const uint LinkLayerPreambleErrorMask = 0x40000000;
-    private const uint LinkLayerStartFrameDelimiterErrorMask = 0x40000000;
-    private const uint LinkLayerUnalignedFrameErrorMask = 0x20000000;
-    private const uint LinkLayerWrongInterframeGapErrorMask = 0x10000000;
-    private const uint LinkLayerPacketTooShortErrorMask = 0x08000000;
-    private const uint LinkLayerPacketTooLongErrorMask = 0x04000000;
-    private const uint LinkLayerCrcErrorMask = 0x02000000;
+    /// <summary>
+    /// The flags (epb_flags) describing a packet's direction, reception type and link layer errors.
+    /// </summary>
+    public class PacketOptionFlags
+    {
+        private const uint DirectionMask = 0x00000003;
+        private const uint InboundDirection = 1;
+        private const uint OutboundDirection = 2;
+        private const uint ReceptionTypeMask = 0x0000001C;
+        private const int ReceptionTypeOffset = 2;
+        private const uint UnicastReceptionType = 1;
+        private const uint MulticastReceptionType = 2;
+        private const uint BroadcastReceptionType = 3;
+        private const uint PromiscuousReceptionType = 4;
+        private const uint FcsLengthMask = 0x000001E0;
+        private const int FcsLengthOffset = 5;
+        private const uint LinkLayerSymbolErrorMask = 0x80000000;
+        private const uint LinkLayerPreambleErrorMask = 0x40000000;
+        private const uint LinkLayerStartFrameDelimiterErrorMask = 0x20000000;
+        private const uint LinkLayerUnalignedFrameErrorMask = 0x10000000;
+        private const uint LinkLayerWrongInterframeGapErrorMask = 0x08000000;
+        private const uint LinkLayerPacketTooShortErrorMask = 0x04000000;
+        private const uint LinkLayerPacketTooLongErrorMask = 0x02000000;
+        private const uint LinkLayerCrcErrorMask = 0x01000000;
 
-    private readonly uint optionValue;
+        private readonly uint optionValue;
 
-    internal PacketOptionFlags(byte[] optionValue)
-    {
-      this.optionValue = BitConverter.ToUInt32(optionValue, 0);
-    }
+        internal PacketOptionFlags(byte[] optionValue)
+            : this(BitConverter.ToUInt32(optionValue, 0))
+        {
+        }
 
-    public bool ContainsLinkLayerCrcError()
-    {
-      return (this.optionValue & LinkLayerCrcErrorMask) > 0;
+        internal PacketOptionFlags(uint optionValue)
+        {
+            this.optionValue = optionValue;
+        }
+
+        /// <summary>
+        /// Gets whether the packet had a CRC error.
+        /// </summary>
+        /// <returns><c>true</c> if the flag is set.</returns>
+        public bool ContainsLinkLayerCrcError()
+        {
+            return (this.optionValue & LinkLayerCrcErrorMask) > 0;
+        }
+
+        /// <summary>
+        /// Gets whether the packet was too long.
+        /// </summary>
+        /// <returns><c>true</c> if the flag is set.</returns>
+        public bool ContainsLinkLayerPacketTooLongError()
+        {
+            return (this.optionValue & LinkLayerPacketTooLongErrorMask) > 0;
+        }
+
+        /// <summary>
+        /// Gets whether the packet was too short.
+        /// </summary>
+        /// <returns><c>true</c> if the flag is set.</returns>
+        public bool ContainsLinkLayerPacketTooShortError()
+        {
+            return (this.optionValue & LinkLayerPacketTooShortErrorMask) > 0;
+        }
+
+        /// <summary>
+        /// Gets whether the packet had a preamble error.
+        /// </summary>
+        /// <returns><c>true</c> if the flag is set.</returns>
+        public bool ContainsLinkLayerPreambleError()
+        {
+            return (this.optionValue & LinkLayerPreambleErrorMask) > 0;
+        }
+
+        /// <summary>
+        /// Gets whether the packet had a start frame delimiter error.
+        /// </summary>
+        /// <returns><c>true</c> if the flag is set.</returns>
+        public bool ContainsLinkLayerStartFrameDelimiterError()
+        {
+            return (this.optionValue & LinkLayerStartFrameDelimiterErrorMask) > 0;
+        }
+
+        /// <summary>
+        /// Gets whether the packet had a symbol error.
+        /// </summary>
+        /// <returns><c>true</c> if the flag is set.</returns>
+        public bool ContainsLinkLayerSymbolError()
+        {
+            return (this.optionValue & LinkLayerSymbolErrorMask) > 0;
+        }
+
+        /// <summary>
+        /// Gets whether the packet had an unaligned frame error.
+        /// </summary>
+        /// <returns><c>true</c> if the flag is set.</returns>
+        public bool ContainsLinkLayerUnalignedFrameError()
+        {
+            return (this.optionValue & LinkLayerUnalignedFrameErrorMask) > 0;
+        }
+
+        /// <summary>
+        /// Gets whether the packet had a wrong inter-frame gap error.
+        /// </summary>
+        /// <returns><c>true</c> if the flag is set.</returns>
+        public bool ContainsLinkLayerWrongInterframeGapError()
+        {
+            return (this.optionValue & LinkLayerWrongInterframeGapErrorMask) > 0;
+        }
+
+        /// <summary>
+        /// Gets the length of the frame check sequence in bytes.
+        /// </summary>
+        /// <returns>The FCS length, or 0 if it is not available.</returns>
+        public uint GetFcsLength()
+        {
+            return (this.optionValue & FcsLengthMask) >> FcsLengthOffset;
+        }
+        internal byte[] GetOptionValue()
+        {
+            return BitConverter.GetBytes(this.optionValue);
+        }
+
+        /// <summary>
+        /// Gets whether the packet was received as broadcast.
+        /// </summary>
+        /// <returns><c>true</c> if the packet was broadcast.</returns>
+        public bool IsBroadcast()
+        {
+            return this.GetReceptionType() == BroadcastReceptionType;
+        }
+
+        /// <summary>
+        /// Gets whether the packet was inbound.
+        /// </summary>
+        /// <returns><c>true</c> if the packet was inbound.</returns>
+        public bool IsInbound()
+        {
+            return (this.optionValue & DirectionMask) == InboundDirection;
+        }
+
+        /// <summary>
+        /// Gets whether the packet was outbound.
+        /// </summary>
+        /// <returns><c>true</c> if the packet was outbound.</returns>
+        public bool IsOutbound()
+        {
+            return (this.optionValue & DirectionMask) == OutboundDirection;
+        }
+
+        /// <summary>
+        /// Gets whether the packet was received as multicast.
+        /// </summary>
+        /// <returns><c>true</c> if the packet was multicast.</returns>
+        public bool IsMulticast()
+        {
+            return this.GetReceptionType() == MulticastReceptionType;
+        }
+
+        /// <summary>
+        /// Gets whether the packet was received in promiscuous mode.
+        /// </summary>
+        /// <returns><c>true</c> if the packet was received promiscuously.</returns>
+        public bool IsPromiscuous()
+        {
+            return this.GetReceptionType() == PromiscuousReceptionType;
+        }
+
+        /// <summary>
+        /// Gets whether the packet was received as unicast.
+        /// </summary>
+        /// <returns><c>true</c> if the packet was unicast.</returns>
+        public bool IsUnicast()
+        {
+            return this.GetReceptionType() == UnicastReceptionType;
+        }
+
+        private uint GetReceptionType()
+        {
+            return (this.optionValue & ReceptionTypeMask) >> ReceptionTypeOffset;
+        }
     }
-    public bool ContainsLinkLayerPacketTooLongError()
-    {
-      return (this.optionValue & LinkLayerPacketTooLongErrorMask) > 0;
-    }
-    public bool ContainsLinkLayerPacketTooShortError()
-    {
-      return (this.optionValue & LinkLayerPacketTooShortErrorMask) > 0;
-    }
-    public bool ContainsLinkLayerPreambleError()
-    {
-      return (this.optionValue & LinkLayerPreambleErrorMask) > 0;
-    }
-    public bool ContainsLinkLayerStartFrameDelimiterError()
-    {
-      return (this.optionValue & LinkLayerStartFrameDelimiterErrorMask) > 0;
-    }
-    public bool ContainsLinkLayerSymbolError()
-    {
-      return (this.optionValue & LinkLayerSymbolErrorMask) > 0;
-    }
-    public bool ContainsLinkLayerUnalignedFrameError()
-    {
-      return (this.optionValue & LinkLayerUnalignedFrameErrorMask) > 0;
-    }
-    public bool ContainsLinkLayerWrongInterframeGapError()
-    {
-      return (this.optionValue & LinkLayerWrongInterframeGapErrorMask) > 0;
-    }
-    public uint GetFcsLength()
-    {
-      return (this.optionValue & FcsLengthMask) >> FcsLengthOffset;
-    }
-    internal byte[] GetOptionValue()
-    {
-      return BitConverter.GetBytes(this.optionValue);
-    }
-    public bool IsBroadcast()
-    {
-      return (this.optionValue & BroadcastMask) == BroadcastMask;
-    }
-    public bool IsInbound()
-    {
-      return (this.optionValue & InboundMask) > 0;
-    }
-    public bool IsOutbound()
-    {
-      return (this.optionValue & OutboundMask) > 0;
-    }
-    public bool IsMulticast()
-    {
-      return !this.IsBroadcast() && ((this.optionValue & MulticastMask) > 0);
-    }
-    public bool IsPromiscuous()
-    {
-      return (this.optionValue & PromiscuousMask) > 0;
-    }
-    public bool IsUnicast()
-    {
-      return !this.IsBroadcast() && ((this.optionValue & UnicastMask) > 0);
-    }
-  }
 }

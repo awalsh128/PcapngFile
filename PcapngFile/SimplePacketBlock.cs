@@ -1,5 +1,5 @@
 ﻿/*
-Copyright (c) 2021, Andrew Walsh
+Copyright (c) 2013-2026, Andrew Walsh
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -25,20 +25,30 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace PcapngFile
 {
-  using System;
-  using System.IO;
+    using System;
+    using System.IO;
 
-  public class SimplePacketBlock : BlockBase
-  {
-    public byte[] Data { get; private set; }
-    public UInt32 DataLength { get; private set; }
-
-    internal SimplePacketBlock(BinaryReader reader)
-        : base(reader)
+    /// <summary>
+    /// A captured packet with minimal metadata. It has no timestamp and belongs to the first interface of its section.
+    /// </summary>
+    public class SimplePacketBlock : BlockBase
     {
-      this.DataLength = reader.ReadUInt32();
-      this.Data = reader.ReadBytes((int)this.TotalLength - 16);   // 4 fields x 4 bytes			
-      this.ReadClosingField(reader);
+        /// <summary>
+        /// Gets the captured packet data.
+        /// </summary>
+        public byte[] Data { get; private set; }
+
+        /// <summary>
+        /// Gets the original length of the packet on the wire.
+        /// </summary>
+        public UInt32 DataLength { get; private set; }
+
+        internal SimplePacketBlock(BinaryReader reader)
+            : base(reader)
+        {
+            this.DataLength = reader.ReadUInt32();
+            this.Data = reader.ReadBytes((int)this.TotalLength - 16);   // 4 fields x 4 bytes			
+            this.ReadClosingField(reader);
+        }
     }
-  }
 }
