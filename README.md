@@ -11,6 +11,7 @@
 
 [![CI](https://github.com/awalsh128/PcapngFile/actions/workflows/ci.yml/badge.svg)](https://github.com/awalsh128/PcapngFile/actions/workflows/ci.yml)
 [![NuGet version (PcapngFile)](https://img.shields.io/nuget/v/PcapngFile.svg)](https://www.nuget.org/packages/PcapngFile/)
+[![NuGet downloads](https://img.shields.io/nuget/dt/PcapngFile.svg)](https://www.nuget.org/packages/PcapngFile/)
 
 > [!TIP]
 > If you find this project useful, please consider supporting it [as a sponsor and show some ❤️ for open source maintainers](https://github.com/sponsors/awalsh128).
