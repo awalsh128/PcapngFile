@@ -5,12 +5,15 @@
 <h1 align="center">.NET PCAP-NG File Reader</h1>
 
 <p align="center">
-  Reads PCAP Next Generation (pcapng) files and generates CLR objects from its data.<br/>
+  <a href="https://www.nuget.org/packages/PcapngFile">NuGet Package</a> that reads PCAP Next Generation (pcapng) files and generates CLR objects from its data.<br/>
   Implemented according to the <a http="https://datatracker.ietf.org/doc/draft-ietf-opsawg-pcapng/">PCAP-NG draft specification</a>.
 </p>
 
 [![CI](https://github.com/awalsh128/PcapngFile/actions/workflows/ci.yml/badge.svg)](https://github.com/awalsh128/PcapngFile/actions/workflows/ci.yml)
 [![NuGet version (PcapngFile)](https://img.shields.io/nuget/v/PcapngFile.svg)](https://www.nuget.org/packages/PcapngFile/)
+
+> [!TIP]
+> If you find this project useful, please consider supporting it [as a sponsor and show some ❤️ for open source maintainers](https://github.com/sponsors/awalsh128).
 
 ## Requirements
 
