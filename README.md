@@ -1,9 +1,16 @@
-# PCAP-NG File Reader
+<p align="center">
+  <img src="logo.png" alt="PCAP-NG File Reader logo" width="128" height="128">
+</p>
+
+<h1 align="center">.NET PCAP-NG File Reader</h1>
+
+<p align="center">
+  Reads PCAP Next Generation (pcapng) files and generates CLR objects from its data.<br/>
+  Implemented according to the <a http="https://datatracker.ietf.org/doc/draft-ietf-opsawg-pcapng/">PCAP-NG draft specification</a>.
+</p>
 
 [![CI](https://github.com/awalsh128/PcapngFile/actions/workflows/ci.yml/badge.svg)](https://github.com/awalsh128/PcapngFile/actions/workflows/ci.yml)
 [![NuGet version (PcapngFile)](https://img.shields.io/nuget/v/PcapngFile.svg)](https://www.nuget.org/packages/PcapngFile/)
-
-Reads PCAP Next Generation (pcapng) files and generates CLR objects from its data. Implemented according to the [pcapng draft specification](https://datatracker.ietf.org/doc/draft-ietf-opsawg-pcapng/).
 
 ## Requirements
 
@@ -91,15 +98,15 @@ Sections with a major version other than 1 are skipped, as the spec requires.
 
 ## Block types
 
-| Class | Contents |
-| --- | --- |
-| `SectionHeaderBlock` | Starts a section of the file: format version, hardware, OS and application that wrote it. |
+| Class                       | Contents                                                                                                   |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `SectionHeaderBlock`        | Starts a section of the file: format version, hardware, OS and application that wrote it.                  |
 | `InterfaceDescriptionBlock` | An interface that packets were captured on: link type, snap length, name, addresses, timestamp resolution. |
-| `EnhancedPacketBlock` | A captured packet with its interface, timestamp, lengths and flags. |
-| `SimplePacketBlock` | A captured packet with only its data and original length. |
-| `PacketBlock` | A captured packet in the obsolete Packet Block format. |
-| `NameResolutionBlock` | Address to host name records, and the DNS server that resolved them. |
-| `InterfaceStatisticsBlock` | Capture statistics for an interface: packets received, dropped and accepted by the filter. |
+| `EnhancedPacketBlock`       | A captured packet with its interface, timestamp, lengths and flags.                                        |
+| `SimplePacketBlock`         | A captured packet with only its data and original length.                                                  |
+| `PacketBlock`               | A captured packet in the obsolete Packet Block format.                                                     |
+| `NameResolutionBlock`       | Address to host name records, and the DNS server that resolved them.                                       |
+| `InterfaceStatisticsBlock`  | Capture statistics for an interface: packets received, dropped and accepted by the filter.                 |
 
 `Reader.GetClrType` and `Reader.GetStoreType<T>` convert between a `BlockType` value and its class.
 
