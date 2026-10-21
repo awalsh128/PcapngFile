@@ -1,5 +1,5 @@
 ﻿/*
-Copyright (c) 2021, Andrew Walsh
+Copyright (c) 2013-2026, Andrew Walsh
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -25,319 +25,420 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace PcapngFile
 {
-  using System;
-  using System.Collections.Generic;
-  using System.IO;
-  using System.Text;
-
-  /// <summary>
-  /// Reads PCAP Next Generation files and generates CLR objects from its data.
-  /// </summary>
-  /// <remarks>
-  /// Implemented according to the draft specification at http://www.winpcap.org/ntar/draft/PCAP-DumpFileFormat.html.
-  /// </remarks>
-  public class Reader : IDisposable
-  {
-    private readonly BinaryReader reader;
-    private readonly Stream stream;
+    using System;
+    using System.Buffers.Binary;
+    using System.Collections.Generic;
+    using System.IO;
 
     /// <summary>
-    /// Get all blocks of all types upcast to the base class.
-    /// </summary>		
-    public IEnumerable<BlockBase> AllBlocks => this.GetAllBlockIterator();
-
-    /// <summary>
-    /// Gets the underlying stream length.
+    /// Reads PCAP Next Generation files and generates CLR objects from its data.
     /// </summary>
-    public long? BaseStreamLength => this.stream.CanSeek ? this.stream.Length : (long?)null;
-
-    /// <summary>
-    /// Gets the underlying stream position.
-    /// </summary>
-    public long? BaseStreamPosition => this.stream.CanSeek ? this.stream.Position : (long?)null;
-
-    /// <summary>
-    /// Get all enhanced packet blocks.
-    /// </summary>
-    public IEnumerable<EnhancedPacketBlock> EnhancedPacketBlocks
-    {
-      get { return GetIterator(r => new EnhancedPacketBlock(r), BlockType.EnhancedPacket); }
-    }
-
-    /// <summary>
-    /// Get all interface description blocks.
-    /// </summary>
-    public IEnumerable<InterfaceDescriptionBlock> InterfaceDescriptionBlocks
-    {
-      get { return GetIterator(r => new InterfaceDescriptionBlock(r), BlockType.InterfaceDescription); }
-    }
-
-    /// <summary>
-    /// Get all interface statistics blocks.
-    /// </summary>
-    public IEnumerable<InterfaceStatisticsBlock> InterfaceStatisticsBlocks
-    {
-      get { return GetIterator(r => new InterfaceStatisticsBlock(r), BlockType.InterfaceStatistics); }
-    }
-
-    /// <summary>
-    /// Get all name resolution blocks.
-    /// </summary>
-    public IEnumerable<NameResolutionBlock> NameResolutionBlocks
-    {
-      get { return GetIterator(r => new NameResolutionBlock(r), BlockType.NameResolution); }
-    }
-
-    /// <summary>
-    /// Get all packet blocks.
-    /// </summary>
-    public IEnumerable<PacketBlock> PacketBlocks
-    {
-      get { return GetIterator(r => new PacketBlock(r), BlockType.Packet); }
-    }
-    /// <summary>
-    /// Get all section header blocks.
-    /// </summary>
-    public IEnumerable<SectionHeaderBlock> SectionHeaderBlocks
-    {
-      get { return GetIterator(r => new SectionHeaderBlock(r), BlockType.SectionHeader); }
-    }
-
-    /// <summary>
-    /// Get all simple packet blocks.
-    /// </summary>
-    public IEnumerable<SimplePacketBlock> SimplePacketBlocks
-    {
-      get { return GetIterator(r => new SimplePacketBlock(r), BlockType.SimplePacket); }
-    }
-
-    /// <summary>
-    /// Construct a PCAP-NG file reader from a given stream.
-    /// </summary>
-    /// <param name="stream">The stream of the PCAP-NG file being read.</param>
-    /// <param name="leaveOpen">Leave stream open on reader <see cref="Dispose"/>.</param>
-    public Reader(Stream stream, bool leaveOpen = false)
-    {
-      this.stream = stream;
-      this.reader = new BinaryReader(this.stream, Encoding.UTF8, leaveOpen);
-    }
-
-    /// <summary>
-    /// Construct a PCAP-NG file reader from a given file name.
-    /// </summary>
-    /// <param name="filename">The filename of the PCAP-NG file being read.</param>
-    public Reader(string filename)
-            : this(new FileStream(filename, FileMode.Open), false)
-    { }
-
-    public void Dispose()
-    {
-      Dispose(true);
-      GC.SuppressFinalize(this);
-    }
-
-    protected virtual void Dispose(bool disposing)
-    {
-      if (disposing)
-      {
-        reader.Dispose();
-      }
-    }
-
-    private IEnumerable<BlockBase> GetAllBlockIterator()
-    {
-      BlockType type;
-
-      do
-      {
-        type = this.PeekStoreType();
-        switch (type)
-        {
-          case BlockType.EnhancedPacket:
-            yield return new EnhancedPacketBlock(this.reader);
-            break;
-          case BlockType.InterfaceDescription:
-            yield return new InterfaceDescriptionBlock(this.reader);
-            break;
-          case BlockType.InterfaceStatistics:
-            yield return new InterfaceStatisticsBlock(this.reader);
-            break;
-          case BlockType.NameResolution:
-            yield return new NameResolutionBlock(this.reader);
-            break;
-          case BlockType.None:
-            // EOF
-            break;
-          case BlockType.Packet:
-            yield return new PacketBlock(this.reader);
-            break;
-          case BlockType.SectionHeader:
-            yield return new SectionHeaderBlock(this.reader);
-            break;
-          case BlockType.SimplePacket:
-            yield return new SimplePacketBlock(this.reader);
-            break;
-          default:
-            throw new IOException("Unable to determine the block type (type = " + type + ").");
-        }
-      }
-      while (type != BlockType.None);
-
-      this.Reset();
-    }
-
-    private IEnumerable<T> GetIterator<T>(Func<BinaryReader, T> blockGenerator, BlockType iteratorBlockType)
-    {
-      const uint blockHeaderLength = BlockBase.BlockTypeLength + BlockBase.BlockTotalLengthLength;
-
-      do
-      {
-        var readType = (BlockType)this.reader.ReadUInt32();
-        if (readType == iteratorBlockType)
-        {
-          _ = this.stream.Seek(-BlockBase.BlockTypeLength, SeekOrigin.Current);
-          yield return blockGenerator(this.reader);
-        }
-        else
-        {
-          UInt32 totalBlockLength = this.reader.ReadUInt32();
-          _ = this.stream.Seek(totalBlockLength - blockHeaderLength, SeekOrigin.Current);
-        }
-      }
-      while (this.reader.PeekChar() > 0);
-
-      this.Reset();
-    }
-
-    /// <summary>
-    /// Gets the CLR class type from the store type enumeration.
-    /// </summary>
-    /// <param name="value">The store type enumeration.</param>
-    /// <returns>The CLR class type from the store type enumeration.</returns>
-    public static Type GetClrType(BlockType value)
-    {
-      return value switch
-      {
-        BlockType.EnhancedPacket => typeof(EnhancedPacketBlock),
-        BlockType.InterfaceDescription => typeof(InterfaceDescriptionBlock),
-        BlockType.InterfaceStatistics => typeof(InterfaceStatisticsBlock),
-        BlockType.NameResolution => typeof(NameResolutionBlock),
-        BlockType.None => null,
-        BlockType.Packet => typeof(PacketBlock),
-        BlockType.SectionHeader => typeof(SectionHeaderBlock),
-        BlockType.SimplePacket => typeof(SimplePacketBlock),
-        _ => throw new ArgumentOutOfRangeException("Unable to determine the block type (value = " + value + ")."),
-      };
-    }
-
-    /// <summary>
-    /// Gets the store type enumeration from the CLR class type.
-    /// </summary>
-    /// <typeparam name="T">The CLR type parameter.</typeparam>
-    /// <returns>The store type enumeration from the CLR class type.</returns>
-    public static BlockType GetStoreType<T>() where T : BlockBase
-    {
-      Type clrType = typeof(T);
-      if (clrType == typeof(EnhancedPacketBlock))
-      {
-        return BlockType.EnhancedPacket;
-      }
-      if (clrType == typeof(InterfaceDescriptionBlock))
-      {
-        return BlockType.InterfaceDescription;
-      }
-      if (clrType == typeof(InterfaceStatisticsBlock))
-      {
-        return BlockType.InterfaceStatistics;
-      }
-      if (clrType == typeof(NameResolutionBlock))
-      {
-        return BlockType.NameResolution;
-      }
-      if (clrType == typeof(PacketBlock))
-      {
-        return BlockType.Packet;
-      }
-      if (clrType == typeof(SectionHeaderBlock))
-      {
-        return BlockType.SectionHeader;
-      }
-      if (clrType == typeof(SimplePacketBlock))
-      {
-        return BlockType.SimplePacket;
-      }
-      throw new ArgumentException("CLR type not mapped to a valid BlockType (typeof(T) = " + typeof(T) + ").");
-    }
-
-    /// <summary>
-    /// Peek the CLR class type value without moving the file cursor.
-    /// </summary>
-    /// <returns>The CLR class type value or null if EOF is reached.</returns>		
-    public Type PeekClrType()
-    {
-      return GetClrType(PeekStoreType());
-    }
-
-    /// <summary>
-    /// Peek the CLR class type value without moving the file cursor.
-    /// </summary>
-    /// <returns>The CLR class type value or <see cref="BlockType.None"/> if EOF is reached.</returns>	
-    public BlockType PeekStoreType()
-    {
-      if (reader.PeekChar() > 0)
-      {
-        var type = (BlockType)this.reader.ReadUInt32();
-        _ = this.stream.Seek(-BlockBase.BlockTypeLength, SeekOrigin.Current);
-        return type;
-      }
-      else
-      {
-        return BlockType.None;
-      }
-    }
-
-    /// <summary>
-    /// Read the next block from the file cursor upcast to the base class.
-    /// </summary>
-    /// <returns>The next block from the file cursor upcast to the base class.</returns>
-    /// <remarks>The return type will be the base class (<see cref="BlockBase"/>) but the actual type will be different.</remarks>
-    public BlockBase ReadBlock()
-    {
-      BlockType type = this.PeekStoreType();
-      BlockBase block = type switch
-      {
-        BlockType.EnhancedPacket => new EnhancedPacketBlock(this.reader),
-        BlockType.InterfaceDescription => new InterfaceDescriptionBlock(this.reader),
-        BlockType.InterfaceStatistics => new InterfaceStatisticsBlock(this.reader),
-        BlockType.NameResolution => new NameResolutionBlock(this.reader),
-        BlockType.Packet => new PacketBlock(this.reader),
-        BlockType.SectionHeader => new SectionHeaderBlock(this.reader),
-        BlockType.SimplePacket => new SimplePacketBlock(this.reader),
-        BlockType.None => null,
-        _ => throw new IOException("Unable to determine the block type (type = " + type + ")."),
-      };
-      return block;
-    }
-
-    /// <summary>
-    /// Read the next block from the file cursor cast to the given class.
-    /// </summary>
-    /// <returns>The next block from the file cursor cast to the given class.</returns>
-    /// <typeparam name="T">The expected class type to be read.</typeparam>
     /// <remarks>
-    /// Make sure to <see cref="PeekClrType"/> first since an incorrect type parameter will result in an <see cref="InvalidCastException"/>.
+    /// <para>
+    /// Implemented according to the draft specification at https://datatracker.ietf.org/doc/draft-ietf-opsawg-pcapng/.
+    /// </para>
+    /// <para>
+    /// Blocks are read sequentially, so the stream does not need to support seeking unless <see cref="Reset"/> is used.
+    /// Sections of either byte order are supported. Blocks of types this library does not support are skipped, as are
+    /// whole sections whose major version is not 1.
+    /// </para>
     /// </remarks>
-    public T ReadBlock<T>() where T : BlockBase
+    public class Reader : IDisposable
     {
-      return (T)ReadBlock();
-    }
+        private const int BlockHeaderLength = BlockBase.BlockTypeLength + BlockBase.BlockTotalLengthLength;
+        private const int ByteOrderMagicLength = 4;
+        private const uint ByteOrderMagic = 0x1A2B3C4D;
+        private const uint SwappedByteOrderMagic = 0x4D3C2B1A;
+        private const uint MinimumBlockLength = BlockHeaderLength + BlockBase.BlockTotalLengthLength;
+        private const uint MinimumSectionHeaderLength = 28;
+        private const int SectionHeaderMajorVersionOffset = 12;
+        private const ushort SupportedMajorVersion = 1;
+        private const int InterfaceSnapLengthOffset = 12;
 
-    /// <summary>
-    /// Reset the file cursor to the beginning.
-    /// </summary>
-    public void Reset()
-    {
-      _ = this.reader.BaseStream.Seek(0, SeekOrigin.Begin);
+        private readonly bool leaveOpen;
+        private readonly Stream stream;
+
+        // The byte order of the current section, set by its Section Header Block.
+        private bool isBigEndian;
+
+        // Whether the current section has a major version this library can't read, so its blocks are skipped.
+        private bool isUnsupportedSection;
+
+        // The snap length of the current section's first interface, used by Simple Packet Blocks.
+        private uint? firstInterfaceSnapLength;
+
+        // The next supported block, read ahead by a peek but not yet returned.
+        private RawBlock pending;
+
+        /// <summary>
+        /// Get all blocks of all types upcast to the base class.
+        /// </summary>
+        public IEnumerable<BlockBase> AllBlocks => this.GetAllBlockIterator();
+
+        /// <summary>
+        /// Gets the underlying stream length.
+        /// </summary>
+        public long? BaseStreamLength => this.stream.CanSeek ? this.stream.Length : (long?)null;
+
+        /// <summary>
+        /// Gets the underlying stream position.
+        /// </summary>
+        /// <remarks>After a peek, this is past the peeked block.</remarks>
+        public long? BaseStreamPosition => this.stream.CanSeek ? this.stream.Position : (long?)null;
+
+        /// <summary>
+        /// Get all enhanced packet blocks.
+        /// </summary>
+        public IEnumerable<EnhancedPacketBlock> EnhancedPacketBlocks => this.GetIterator<EnhancedPacketBlock>();
+
+        /// <summary>
+        /// Get all interface description blocks.
+        /// </summary>
+        public IEnumerable<InterfaceDescriptionBlock> InterfaceDescriptionBlocks => this.GetIterator<InterfaceDescriptionBlock>();
+
+        /// <summary>
+        /// Get all interface statistics blocks.
+        /// </summary>
+        public IEnumerable<InterfaceStatisticsBlock> InterfaceStatisticsBlocks => this.GetIterator<InterfaceStatisticsBlock>();
+
+        /// <summary>
+        /// Get all name resolution blocks.
+        /// </summary>
+        public IEnumerable<NameResolutionBlock> NameResolutionBlocks => this.GetIterator<NameResolutionBlock>();
+
+        /// <summary>
+        /// Get all packet blocks.
+        /// </summary>
+        public IEnumerable<PacketBlock> PacketBlocks => this.GetIterator<PacketBlock>();
+
+        /// <summary>
+        /// Get all section header blocks.
+        /// </summary>
+        public IEnumerable<SectionHeaderBlock> SectionHeaderBlocks => this.GetIterator<SectionHeaderBlock>();
+
+        /// <summary>
+        /// Get all simple packet blocks.
+        /// </summary>
+        public IEnumerable<SimplePacketBlock> SimplePacketBlocks => this.GetIterator<SimplePacketBlock>();
+
+        /// <summary>
+        /// Construct a PCAP-NG file reader from a given stream.
+        /// </summary>
+        /// <param name="stream">The stream of the PCAP-NG file being read. It does not need to support seeking.</param>
+        /// <param name="leaveOpen">Leave stream open on reader <see cref="Dispose()"/>.</param>
+        public Reader(Stream stream, bool leaveOpen = false)
+        {
+            this.stream = stream ?? throw new ArgumentNullException(nameof(stream));
+            this.leaveOpen = leaveOpen;
+        }
+
+        /// <summary>
+        /// Construct a PCAP-NG file reader from a given file name.
+        /// </summary>
+        /// <param name="filename">The filename of the PCAP-NG file being read.</param>
+        public Reader(string filename)
+                : this(File.OpenRead(filename), false)
+        { }
+
+        /// <summary>
+        /// Releases the reader and, unless it was created with <c>leaveOpen</c>, the underlying stream.
+        /// </summary>
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        /// <summary>
+        /// Releases the reader's resources.
+        /// </summary>
+        /// <param name="disposing"><c>true</c> when called from <see cref="Dispose()"/>.</param>
+        protected virtual void Dispose(bool disposing)
+        {
+            if (disposing && !this.leaveOpen)
+            {
+                this.stream.Dispose();
+            }
+        }
+
+        private IEnumerable<BlockBase> GetAllBlockIterator()
+        {
+            BlockBase block;
+            while ((block = this.ReadBlock()) != null)
+            {
+                yield return block;
+            }
+
+            this.ResetIfSeekable();
+        }
+
+        private IEnumerable<T> GetIterator<T>() where T : BlockBase
+        {
+            var iteratorBlockType = GetStoreType<T>();
+            RawBlock raw;
+            while ((raw = this.PeekRawBlock()) != null)
+            {
+                this.pending = null;
+                if (raw.Type == iteratorBlockType)
+                {
+                    yield return (T)CreateBlock(raw);
+                }
+            }
+
+            this.ResetIfSeekable();
+        }
+
+        /// <summary>
+        /// Gets the CLR class type from the store type enumeration.
+        /// </summary>
+        /// <param name="value">The store type enumeration.</param>
+        /// <returns>The CLR class type from the store type enumeration.</returns>
+        public static Type GetClrType(BlockType value)
+        {
+            return value switch
+            {
+                BlockType.EnhancedPacket => typeof(EnhancedPacketBlock),
+                BlockType.InterfaceDescription => typeof(InterfaceDescriptionBlock),
+                BlockType.InterfaceStatistics => typeof(InterfaceStatisticsBlock),
+                BlockType.NameResolution => typeof(NameResolutionBlock),
+                BlockType.None => null,
+                BlockType.Packet => typeof(PacketBlock),
+                BlockType.SectionHeader => typeof(SectionHeaderBlock),
+                BlockType.SimplePacket => typeof(SimplePacketBlock),
+                _ => throw new ArgumentOutOfRangeException("Unable to determine the block type (value = " + value + ")."),
+            };
+        }
+
+        /// <summary>
+        /// Gets the store type enumeration from the CLR class type.
+        /// </summary>
+        /// <typeparam name="T">The CLR type parameter.</typeparam>
+        /// <returns>The store type enumeration from the CLR class type.</returns>
+        public static BlockType GetStoreType<T>() where T : BlockBase
+        {
+            Type clrType = typeof(T);
+            if (clrType == typeof(EnhancedPacketBlock))
+            {
+                return BlockType.EnhancedPacket;
+            }
+            if (clrType == typeof(InterfaceDescriptionBlock))
+            {
+                return BlockType.InterfaceDescription;
+            }
+            if (clrType == typeof(InterfaceStatisticsBlock))
+            {
+                return BlockType.InterfaceStatistics;
+            }
+            if (clrType == typeof(NameResolutionBlock))
+            {
+                return BlockType.NameResolution;
+            }
+            if (clrType == typeof(PacketBlock))
+            {
+                return BlockType.Packet;
+            }
+            if (clrType == typeof(SectionHeaderBlock))
+            {
+                return BlockType.SectionHeader;
+            }
+            if (clrType == typeof(SimplePacketBlock))
+            {
+                return BlockType.SimplePacket;
+            }
+            throw new ArgumentException("CLR type not mapped to a valid BlockType (typeof(T) = " + typeof(T) + ").");
+        }
+
+        /// <summary>
+        /// Peek the CLR class type of the next block without consuming it.
+        /// </summary>
+        /// <returns>The CLR class type value or null if EOF is reached.</returns>
+        public Type PeekClrType()
+        {
+            return GetClrType(PeekStoreType());
+        }
+
+        /// <summary>
+        /// Peek the store type of the next block without consuming it.
+        /// </summary>
+        /// <returns>The store type or <see cref="BlockType.None"/> if EOF is reached.</returns>
+        public BlockType PeekStoreType()
+        {
+            return this.PeekRawBlock()?.Type ?? BlockType.None;
+        }
+
+        /// <summary>
+        /// Read the next block upcast to the base class.
+        /// </summary>
+        /// <returns>The next block upcast to the base class, or <c>null</c> if EOF is reached.</returns>
+        /// <remarks>The return type will be the base class (<see cref="BlockBase"/>) but the actual type will be different.</remarks>
+        public BlockBase ReadBlock()
+        {
+            var raw = this.PeekRawBlock();
+            if (raw == null)
+            {
+                return null;
+            }
+            this.pending = null;
+            return CreateBlock(raw);
+        }
+
+        /// <summary>
+        /// Read the next block cast to the given class.
+        /// </summary>
+        /// <returns>The next block cast to the given class.</returns>
+        /// <typeparam name="T">The expected class type to be read.</typeparam>
+        /// <remarks>
+        /// Make sure to <see cref="PeekClrType"/> first since an incorrect type parameter will result in an <see cref="InvalidCastException"/>.
+        /// </remarks>
+        public T ReadBlock<T>() where T : BlockBase
+        {
+            return (T)ReadBlock();
+        }
+
+        /// <summary>
+        /// Reset the file cursor to the beginning.
+        /// </summary>
+        /// <exception cref="NotSupportedException">The underlying stream does not support seeking.</exception>
+        public void Reset()
+        {
+            if (!this.stream.CanSeek)
+            {
+                throw new NotSupportedException("Reset requires a stream that supports seeking.");
+            }
+            _ = this.stream.Seek(0, SeekOrigin.Begin);
+            this.pending = null;
+            this.isBigEndian = false;
+            this.isUnsupportedSection = false;
+            this.firstInterfaceSnapLength = null;
+        }
+
+        private void ResetIfSeekable()
+        {
+            if (this.stream.CanSeek)
+            {
+                this.Reset();
+            }
+        }
+
+        private static BlockBase CreateBlock(RawBlock raw)
+        {
+            using var reader = new EndianBinaryReader(raw.Data, raw.IsBigEndian);
+            return raw.Type switch
+            {
+                BlockType.EnhancedPacket => new EnhancedPacketBlock(reader),
+                BlockType.InterfaceDescription => new InterfaceDescriptionBlock(reader),
+                BlockType.InterfaceStatistics => new InterfaceStatisticsBlock(reader),
+                BlockType.NameResolution => new NameResolutionBlock(reader),
+                BlockType.Packet => new PacketBlock(reader),
+                BlockType.SectionHeader => new SectionHeaderBlock(reader),
+                BlockType.SimplePacket => new SimplePacketBlock(reader, raw.SnapLength),
+                _ => throw new InvalidOperationException("Unsupported block type (type = " + raw.Type + ")."),
+            };
+        }
+
+        private static bool IsSupported(BlockType type)
+        {
+            return type switch
+            {
+                BlockType.EnhancedPacket or
+                BlockType.InterfaceDescription or
+                BlockType.InterfaceStatistics or
+                BlockType.NameResolution or
+                BlockType.Packet or
+                BlockType.SectionHeader or
+                BlockType.SimplePacket => true,
+                _ => false,
+            };
+        }
+
+        // Returns the next supported block without consuming it, skipping unsupported ones, or null at EOF.
+        private RawBlock PeekRawBlock()
+        {
+            while (this.pending == null)
+            {
+                var raw = this.ReadRawBlock();
+                if (raw == null)
+                {
+                    return null;
+                }
+                if (IsSupported(raw.Type) && !this.isUnsupportedSection)
+                {
+                    this.pending = raw;
+                }
+            }
+            return this.pending;
+        }
+
+        // Reads the next whole block from the stream, or returns null at EOF.
+        private RawBlock ReadRawBlock()
+        {
+            var header = new byte[BlockHeaderLength + ByteOrderMagicLength];
+            int headerLength = this.stream.ReadAtLeast(header.AsSpan(0, BlockHeaderLength), BlockHeaderLength, throwOnEndOfStream: false);
+            if (headerLength == 0)
+            {
+                return null;
+            }
+            if (headerLength < BlockHeaderLength)
+            {
+                throw new EndOfStreamException("File ends in the middle of a block header.");
+            }
+
+            // The Section Header Block type reads the same in either byte order; its byte order magic sets the section's.
+            if (BinaryPrimitives.ReadUInt32LittleEndian(header) == (uint)BlockType.SectionHeader)
+            {
+                headerLength += ByteOrderMagicLength;
+                this.stream.ReadExactly(header, BlockHeaderLength, ByteOrderMagicLength);
+                this.isBigEndian = BinaryPrimitives.ReadUInt32LittleEndian(header.AsSpan(BlockHeaderLength)) switch
+                {
+                    ByteOrderMagic => false,
+                    SwappedByteOrderMagic => true,
+                    var magic => throw new IOException("Section header byte order magic not recognized (magic = 0x" + magic.ToString("X8") + ")."),
+                };
+            }
+
+            var type = (BlockType)this.ReadUInt32(header, 0);
+            uint totalLength = this.ReadUInt32(header, BlockBase.BlockTypeLength);
+            uint minimumLength = type == BlockType.SectionHeader ? MinimumSectionHeaderLength : MinimumBlockLength;
+            if (totalLength < minimumLength || totalLength % 4 != 0 || totalLength > int.MaxValue)
+            {
+                throw new IOException("Block total length is invalid (type = " + type + ", length = " + totalLength + ").");
+            }
+
+            var data = new byte[totalLength];
+            header.AsSpan(0, headerLength).CopyTo(data);
+            this.stream.ReadExactly(data, headerLength, data.Length - headerLength);
+            this.TrackSection(type, data);
+            return new RawBlock(type, data, this.isBigEndian, this.firstInterfaceSnapLength ?? 0);
+        }
+
+        // Updates the per-section state that later blocks depend on.
+        private void TrackSection(BlockType type, byte[] data)
+        {
+            if (type == BlockType.SectionHeader)
+            {
+                // Readers must skip sections whose version they can't read. Minor versions only add blocks and options.
+                this.isUnsupportedSection = this.ReadUInt16(data, SectionHeaderMajorVersionOffset) != SupportedMajorVersion;
+                this.firstInterfaceSnapLength = null;
+            }
+            else if (type == BlockType.InterfaceDescription && this.firstInterfaceSnapLength == null && data.Length >= InterfaceSnapLengthOffset + 4)
+            {
+                this.firstInterfaceSnapLength = this.ReadUInt32(data, InterfaceSnapLengthOffset);
+            }
+        }
+
+        private ushort ReadUInt16(byte[] buffer, int offset)
+        {
+            var span = buffer.AsSpan(offset);
+            return this.isBigEndian ? BinaryPrimitives.ReadUInt16BigEndian(span) : BinaryPrimitives.ReadUInt16LittleEndian(span);
+        }
+
+        private uint ReadUInt32(byte[] buffer, int offset)
+        {
+            var span = buffer.AsSpan(offset);
+            return this.isBigEndian ? BinaryPrimitives.ReadUInt32BigEndian(span) : BinaryPrimitives.ReadUInt32LittleEndian(span);
+        }
+
+        // A whole block read from the stream. SnapLength is the section's first interface snap length, for Simple Packet Blocks.
+        private sealed record RawBlock(BlockType Type, byte[] Data, bool IsBigEndian, uint SnapLength);
     }
-  }
 }

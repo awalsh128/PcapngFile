@@ -1,5 +1,5 @@
 ﻿/*
-Copyright (c) 2021, Andrew Walsh
+Copyright (c) 2013-2026, Andrew Walsh
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -25,19 +25,50 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace PcapngFile
 {
-  public enum BlockType : uint
-  {
-    None = 0x00000000,
-    EnhancedPacket = 0x00000006,
-    InterfaceDescription = 0x00000001,
-    InterfaceStatistics = 0x00000005,
-    NameResolution = 0x00000004,
-
     /// <summary>
+    /// The type codes of the blocks in a PCAP-NG file.
     /// </summary>
-    /// <remarks>Marked as obsolete.</remarks>
-    Packet = 0x00000002,
-    SectionHeader = 0x0A0D0D0A,
-    SimplePacket = 0x00000003
-  }
+    public enum BlockType : uint
+    {
+        /// <summary>
+        /// No block; returned when the end of the file is reached.
+        /// </summary>
+        None = 0x00000000,
+
+        /// <summary>
+        /// An <see cref="EnhancedPacketBlock"/>.
+        /// </summary>
+        EnhancedPacket = 0x00000006,
+
+        /// <summary>
+        /// An <see cref="InterfaceDescriptionBlock"/>.
+        /// </summary>
+        InterfaceDescription = 0x00000001,
+
+        /// <summary>
+        /// An <see cref="InterfaceStatisticsBlock"/>.
+        /// </summary>
+        InterfaceStatistics = 0x00000005,
+
+        /// <summary>
+        /// A <see cref="NameResolutionBlock"/>.
+        /// </summary>
+        NameResolution = 0x00000004,
+
+        /// <summary>
+        /// A <see cref="PacketBlock"/>.
+        /// </summary>
+        /// <remarks>Marked as obsolete.</remarks>
+        Packet = 0x00000002,
+
+        /// <summary>
+        /// A <see cref="SectionHeaderBlock"/>.
+        /// </summary>
+        SectionHeader = 0x0A0D0D0A,
+
+        /// <summary>
+        /// A <see cref="SimplePacketBlock"/>.
+        /// </summary>
+        SimplePacket = 0x00000003
+    }
 }

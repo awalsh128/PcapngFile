@@ -1,0 +1,58 @@
+<Project>
+
+  <!-- NuGet package definition for https://www.nuget.org/packages/PcapngFile/, imported by PcapngFile.csproj. -->
+
+  <PropertyGroup>
+    <PackageId>PcapngFile</PackageId>
+    <Version>2.0.0</Version>
+    <Description>Reads PCAP Next Generation files and generates CLR objects from its data. Implemented according to the draft specification at https://datatracker.ietf.org/doc/draft-ietf-opsawg-pcapng/.</Description>
+    <Authors>Andrew Walsh (awalsh128.com)</Authors>
+    <Copyright>Copyright (c) 2013-2026 Andrew Walsh</Copyright>
+    <NeutralLanguage></NeutralLanguage>
+
+    <PackageProjectUrl>https://github.com/awalsh128/PcapngFile</PackageProjectUrl>
+    <RepositoryType>git</RepositoryType>
+    <RepositoryUrl>https://github.com/awalsh128/PcapngFile</RepositoryUrl>
+    <PackageTags>pcap, pcap-ng, packet capture, packet</PackageTags>
+    <PackageLicenseExpression>BSD-2-Clause</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageIcon>logo.png</PackageIcon>
+
+    <PackageReleaseNotes>
+      * Port to .NET 10.0. Breaking: .NET 5 through 9 are no longer targeted.
+      * Add XML documentation for the public API.
+      * Fix block options never being read, so option properties (interface name, packet flags, statistics, etc.) are now populated.
+      * Fix crash when reading a packet hash option.
+      * Fix IPv6 name resolution records being read as 8 bytes instead of 16.
+      * Fix link layer error flags reading the wrong bits.
+      * Fix interface statistics timestamps and Packet Block padding.
+      * Support big-endian sections, including files mixing both byte orders (#4).
+      * Support unseekable streams; Reset requires a seekable stream (#5).
+      * Skip unsupported block types (e.g. Custom and Decryption Secrets Blocks) and name resolution record types instead of throwing.
+      * Fix Reader(string) failing on read-only files.
+      * Support base-2 timestamp resolutions and apply if_tsoffset in EnhancedPacketBlock.GetTimestamp, which now returns UTC and reports precision loss per timestamp.
+      * Fix interfaces without if_tsresol defaulting to a resolution of seconds instead of microseconds.
+      * Skip sections whose major version isn't 1.
+      * End option strings at a zero byte, and skip options with an invalid length, listing them in InvalidOptionCodes.
+      * Keep every value of repeatable options (Comments, IPv4Addresses, IPv6Addresses, Hashes); the singular properties return the first.
+      * Add custom options, the Toeplitz hash algorithm, if_hardware, if_txspeed, if_rxspeed, if_iana_tzname, epb_packetid, epb_queue, epb_verdict, epb_processid_threadid, packet flag bits 9-11, and EUI-48/EUI-64 name resolution records.
+      * Fix SimplePacketBlock.Data including padding; its length now honors the first interface's snap length.
+      * Breaking: PacketBlock.Timestamp is now the raw timestamp, with GetTimestamp to convert it, as in EnhancedPacketBlock.
+      * Add GetTimestamp, GetStartTime and GetEndTime to InterfaceStatisticsBlock.
+    </PackageReleaseNotes>
+
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+
+    <!-- Source Link and a symbol package so the published package can be debugged from source. -->
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="$(MSBuildThisFileDirectory)..\README.md" Pack="true" PackagePath="\" />
+    <None Include="$(MSBuildThisFileDirectory)..\logo.png" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>
