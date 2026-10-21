@@ -16,6 +16,7 @@
     <PackageTags>pcap, pcap-ng, packet capture, packet</PackageTags>
     <PackageLicenseExpression>BSD-2-Clause</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageIcon>logo.png</PackageIcon>
 
     <PackageReleaseNotes>
       * Port to .NET 10.0. Breaking: .NET 5 through 9 are no longer targeted.
@@ -51,10 +52,7 @@
 
   <ItemGroup>
     <None Include="$(MSBuildThisFileDirectory)..\README.md" Pack="true" PackagePath="\" />
-    <None Include="../logo.png">
-      <Pack>True</Pack>
-      <PackagePath></PackagePath>
-    </None>
+    <None Include="$(MSBuildThisFileDirectory)..\logo.png" Pack="true" PackagePath="\" />
   </ItemGroup>
 
 </Project>
