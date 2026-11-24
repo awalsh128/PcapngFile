@@ -6,8 +6,14 @@ on:
   pull_request:
     branches: [ master ]
 
+permissions:
+  contents: read
+
 jobs:
   build:
+    # Updating the `latest` release needs write access to contents.
+    permissions:
+      contents: write
 
     runs-on: ubuntu-24.04
 
